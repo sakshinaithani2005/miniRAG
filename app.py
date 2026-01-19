@@ -8,35 +8,57 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-
+import streamlit as st
+import time
 # Load .env file explicitly
 env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path, override=True)
 
-import streamlit as st
-import time
+
 
 # Validate API keys BEFORE importing modules that use them
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "mini-rag")
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+# PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "mini-rag")
+
+# if not GOOGLE_API_KEY or not PINECONE_API_KEY:
+#     st.set_page_config(page_title="Mini RAG - Setup Required", page_icon="⚠️")
+#     st.error(
+#         "❌ **Missing API Keys**\n\n"
+#         "Please create a `.env` file in the project root with:\n\n"
+#         "```\n"
+#         "GOOGLE_API_KEY=your_google_key_here\n"
+#         "PINECONE_API_KEY=your_pinecone_key_here\n"
+#         "PINECONE_INDEX_NAME=mini-rag\n"
+#         "```\n\n"
+#         "**Get your keys:**\n"
+#         "- Google: https://aistudio.google.com/\n"
+#         "- Pinecone: https://www.pinecone.io/\n\n"
+#         f"*Debug: .env exists: {env_path.exists()}*"
+#     )
+#     st.stop()
+
+
+import streamlit as st
+
+load_dotenv()
+
+def get_secret(key, default=None):
+    return st.secrets.get(key) or os.getenv(key) or default
+
+GOOGLE_API_KEY = get_secret("GOOGLE_API_KEY")
+PINECONE_API_KEY = get_secret("PINECONE_API_KEY")
+PINECONE_INDEX_NAME = get_secret("PINECONE_INDEX_NAME", "mini-rag")
+
+
+
 
 if not GOOGLE_API_KEY or not PINECONE_API_KEY:
-    st.set_page_config(page_title="Mini RAG - Setup Required", page_icon="⚠️")
-    st.error(
-        "❌ **Missing API Keys**\n\n"
-        "Please create a `.env` file in the project root with:\n\n"
-        "```\n"
-        "GOOGLE_API_KEY=your_google_key_here\n"
-        "PINECONE_API_KEY=your_pinecone_key_here\n"
-        "PINECONE_INDEX_NAME=mini-rag\n"
-        "```\n\n"
-        "**Get your keys:**\n"
-        "- Google: https://aistudio.google.com/\n"
-        "- Pinecone: https://www.pinecone.io/\n\n"
-        f"*Debug: .env exists: {env_path.exists()}*"
-    )
+    st.set_page_config(page_title="Setup Required", page_icon="⚠️")
+    st.error("❌ Missing API keys. Configure Streamlit Secrets or .env")
     st.stop()
+
+
 
 # Now import modular components (API keys are guaranteed to be available)
 from config import Config
