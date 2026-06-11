@@ -1,0 +1,81 @@
+"""Tests for hybrid_retriever module."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+_SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
+sys.path.insert(0, str(_SRC))
+sys.path.insert(0, str(_SRC.parent.parent))
+
+
+# ── BM25Index ─────────────────────────────────────────────────────────────────
+
+def _make_docs(texts):
+    from langchain_core.documents import Document
+    return [Document(page_content=t, metadata={"chunk_id": i + 1}) for i, t in enumerate(texts)]
+
+
+def test_bm25_index_top_n_returns_correct_count():
+    from hybrid_retriever import BM25Index
+
+    docs = _make_docs(["alpha beta gamma", "delta epsilon", "zeta eta theta"])
+    idx = BM25Index(docs)
+    results = idx.get_top_n("alpha", n=2)
+    assert len(results) == 2
+
+
+def test_bm25_index_scores_length():
+    from hybrid_retriever import BM25Index
+
+    docs = _make_docs(["foo bar", "baz qux", "quux corge"])
+    idx = BM25Index(docs)
+    scores = idx.get_scores("foo")
+    assert len(scores) == len(docs)
+
+
+def test_bm25_index_keyword_match_ranks_first():
+    from hybrid_retriever import BM25Index
+
+    docs = _make_docs([
+        "transformers are neural networks",
+        "attention mechanism in deep learning",
+        "the quick brown fox",
+    ])
+    idx = BM25Index(docs)
+    top = idx.get_top_n("attention mechanism", n=1)
+    assert "attention" in top[0].page_content.lower()
+
+
+# ── reciprocal_rank_fusion ────────────────────────────────────────────────────
+
+def test_rrf_merges_lists():
+    from hybrid_retriever import reciprocal_rank_fusion
+
+    docs_a = _make_docs(["doc a1", "doc a2"])
+    docs_b = _make_docs(["doc b1"])
+
+    fused = reciprocal_rank_fusion([docs_a, docs_b])
+    assert len(fused) >= 1
+
+
+def test_rrf_deduplicates():
+    from hybrid_retriever import reciprocal_rank_fusion
+
+    # Same documents in both lists
+    docs = _make_docs(["shared doc"])
+    fused = reciprocal_rank_fusion([docs, docs])
+    assert len(fused) == 1  # deduplicated
+
+
+def test_rrf_higher_ranked_docs_score_higher():
+    from hybrid_retriever import reciprocal_rank_fusion
+
+    docs = _make_docs([f"doc {i}" for i in range(5)])
+    # First doc is ranked #1 in both lists
+    fused = reciprocal_rank_fusion([docs, docs])
+    # The first document should remain at position 0
+    assert fused[0].page_content == docs[0].page_content

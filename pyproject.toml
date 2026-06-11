@@ -1,0 +1,123 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "minirag"
+version = "0.2.0"
+description = "Production-grade RAG with Gemini, Pinecone, hybrid retrieval, and RAGAS evaluation"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "miniRAG contributors" }]
+keywords = ["rag", "retrieval-augmented-generation", "gemini", "pinecone", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "streamlit>=1.40.0",
+    "langchain>=0.3",
+    "langchain-core>=0.3",
+    "langchain-google-genai>=2.0",
+    "langchain-pinecone>=0.2",
+    "langchain-community>=0.3",
+    "langchain-classic>=1.0",
+    "langchain-text-splitters>=0.3",
+    "pinecone>=5.0",
+    "google-genai>=1.0",
+    "FlashRank>=0.2",
+    "rank-bm25>=0.2",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "python-dotenv>=1.0",
+    "pypdf>=4.0",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+eval = [
+    "ragas>=0.1",
+    "datasets>=2.0",
+]
+web = [
+    "duckduckgo-search>=6.0",
+]
+docx = [
+    "docx2txt>=0.8",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pre-commit>=3.0",
+    "types-requests",
+]
+all = [
+    "minirag[eval,web,docx,dev]",
+]
+
+[project.scripts]
+minirag = "minirag.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/sakshinaithani2005/miniRAG"
+Repository = "https://github.com/sakshinaithani2005/miniRAG"
+Issues = "https://github.com/sakshinaithani2005/miniRAG/issues"
+
+# ── Tool configs ────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.coverage.run]
+source = ["src/minirag"]
+omit = ["tests/*", "eval/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 70
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "eval"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in default arguments
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["minirag"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+exclude = ["venv", ".venv", "eval/results"]

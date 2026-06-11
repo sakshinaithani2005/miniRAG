@@ -1,0 +1,37 @@
+[
+  {
+    "question": "What problem does the Transformer model solve?",
+    "ground_truth": "The Transformer model solves the problem of sequence transduction tasks like machine translation, eliminating the need for recurrent or convolutional neural networks by relying entirely on attention mechanisms.",
+    "contexts": [
+      "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. The Transformer architecture dispenses with recurrence and convolutions entirely, relying instead on attention mechanisms."
+    ]
+  },
+  {
+    "question": "What is multi-head attention?",
+    "ground_truth": "Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions by linearly projecting the queries, keys, and values h times with different learned projections.",
+    "contexts": [
+      "Multi-head attention allows the model to jointly attend to information from different representation subspaces at different positions. With a single attention head, averaging inhibits this. With multiple heads, the model projects the queries, keys, and values h times with different, learned linear projections."
+    ]
+  },
+  {
+    "question": "How does the model handle word order since it has no recurrence?",
+    "ground_truth": "The Transformer uses positional encodings added to the input embeddings to inject information about the relative or absolute position of tokens in the sequence.",
+    "contexts": [
+      "Since our model contains no recurrence and no convolution, in order for the model to make use of the order of the sequence, we must inject some information about the relative or absolute position of the tokens in the sequence. To this end, we add positional encodings to the input embeddings at the bottoms of the encoder and decoder stacks."
+    ]
+  },
+  {
+    "question": "What are the three types of attention used in the Transformer?",
+    "ground_truth": "The Transformer uses encoder-decoder attention, self-attention in encoder layers, and self-attention in decoder layers (masked to prevent leftward information flow).",
+    "contexts": [
+      "The Transformer uses multi-head attention in three different ways: encoder-decoder attention layers where queries come from the previous decoder layer; encoder self-attention layers; and decoder self-attention layers where each position in the decoder can attend to all positions in the decoder up to and including that position."
+    ]
+  },
+  {
+    "question": "What were the BLEU scores achieved on WMT 2014 English-to-German translation?",
+    "ground_truth": "The big Transformer model achieved 28.4 BLEU on WMT 2014 English-to-German translation, outperforming the best previously reported models by more than 2.0 BLEU.",
+    "contexts": [
+      "On the WMT 2014 English-to-German translation task, the big transformer model outperforms the best previously reported models including ensembles by more than 2.0 BLEU, establishing a new state-of-the-art BLEU score of 28.4."
+    ]
+  }
+]
