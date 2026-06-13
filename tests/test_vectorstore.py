@@ -37,7 +37,6 @@ def test_initialize_vectorstore_index_not_found():
             "config.Config.get_pinecone_index_name", return_value="my-index"
         ):
             with patch("vectorstore.Pinecone") as mock_pinecone:
-                # Mock pc.list_indexes().indexes returning non-matching index
                 mock_pc = MagicMock()
                 mock_idx = MagicMock()
                 mock_idx.name = "other-index"
@@ -64,7 +63,9 @@ def test_initialize_vectorstore_success():
                 mock_pc.list_indexes.return_value.indexes = [mock_idx]
                 mock_pinecone.return_value = mock_pc
 
-                with patch("embeddings.get_embeddings") as mock_get_embed:
+                with patch(
+                    "embeddings.get_embeddings"
+                ) as mock_get_embed:
                     mock_get_embed.return_value = MagicMock()
                     with patch(
                         "vectorstore.PineconeVectorStore"
@@ -105,13 +106,11 @@ def test_add_documents_to_vectorstore_success():
 
                 added = add_documents_to_vectorstore(docs, mock_vs)
 
-                # Verified delete namespaces called
                 mock_pc.Index.assert_called_once_with("my-index")
                 mock_index.delete.assert_called_once_with(
                     delete_all=True, namespace=""
                 )
 
-                # Verified add_documents called in batches of 100
                 assert mock_vs.add_documents.call_count == 2
                 assert added == 150
 

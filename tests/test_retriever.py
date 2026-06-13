@@ -31,7 +31,9 @@ def test_init_reranker_success():
 
 
 def test_init_reranker_failure():
-    with patch("retriever.FlashrankRerank", side_effect=Exception("error")):
+    with patch(
+        "retriever.FlashrankRerank", side_effect=Exception("error")
+    ):
         res = _init_reranker()
         assert res is None
 
@@ -59,7 +61,9 @@ def test_create_retriever_dense_no_reranker():
     mock_vs = MagicMock()
     with patch("retriever.get_reranker", return_value=None):
         create_retriever(mock_vs, strategy=RetrievalStrategy.DENSE)
-        mock_vs.as_retriever.assert_called_once_with(search_kwargs={"k": 10})
+        mock_vs.as_retriever.assert_called_once_with(
+            search_kwargs={"k": 10}
+        )
 
 
 def test_create_retriever_dense_with_reranker():
@@ -78,11 +82,12 @@ def test_create_retriever_dense_with_reranker():
 def test_create_retriever_hybrid_no_corpus_fallback():
     mock_vs = MagicMock()
     with patch("retriever.get_reranker", return_value=None):
-        # Hybrid strategy with empty corpus should fallback to DENSE
         create_retriever(
             mock_vs, corpus=None, strategy=RetrievalStrategy.HYBRID
         )
-        mock_vs.as_retriever.assert_called_once_with(search_kwargs={"k": 10})
+        mock_vs.as_retriever.assert_called_once_with(
+            search_kwargs={"k": 10}
+        )
 
 
 def test_create_retriever_hybrid_success():
@@ -105,15 +110,16 @@ def test_hybrid_with_rerank_invoke():
     from retriever import _HybridWithRerank
 
     mock_hybrid = MagicMock()
-    mock_docs = [Document(page_content="doc 1"), Document(page_content="doc 2")]
+    mock_docs = [
+        Document(page_content="doc 1"),
+        Document(page_content="doc 2"),
+    ]
     mock_hybrid.retrieve.return_value = mock_docs
 
-    # case 1: no reranker
     r = _HybridWithRerank(mock_hybrid, None, top_n=1)
     res = r.invoke("query")
     assert res == mock_docs[:1]
 
-    # case 2: with reranker
     mock_reranker = MagicMock()
     mock_reranker.compress_documents.return_value = mock_docs[::-1]
     r2 = _HybridWithRerank(mock_hybrid, mock_reranker, top_n=2)

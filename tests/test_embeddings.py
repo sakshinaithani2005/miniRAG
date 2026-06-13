@@ -17,13 +17,19 @@ from embeddings import get_embeddings
 
 def test_get_embeddings_without_api_key():
     with patch("config.Config.get_google_api_key", return_value=""):
-        with pytest.raises(ValueError, match="GOOGLE_API_KEY is not set"):
+        with pytest.raises(
+            ValueError, match="GOOGLE_API_KEY is not set"
+        ):
             get_embeddings()
 
 
 def test_get_embeddings_success():
-    with patch("config.Config.get_google_api_key", return_value="fake-key"):
-        with patch("embeddings.GoogleGenerativeAIEmbeddings") as mock_embeddings:
+    with patch(
+        "config.Config.get_google_api_key", return_value="fake-key"
+    ):
+        with patch(
+            "embeddings.GoogleGenerativeAIEmbeddings"
+        ) as mock_embeddings:
             get_embeddings()
             mock_embeddings.assert_called_once_with(
                 model="gemini-embedding-001",
