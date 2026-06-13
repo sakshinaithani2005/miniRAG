@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """
 miniRAG — Streamlit UI
 Production-grade RAG with chat history, streaming, hybrid retrieval, and latency breakdown.
@@ -21,6 +22,7 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_SRC))
 
 from dotenv import load_dotenv
+
 load_dotenv(_ROOT / ".env", override=True)
 
 import streamlit as st
@@ -176,9 +178,8 @@ os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
 os.environ["PINECONE_INDEX_NAME"] = PINECONE_INDEX_NAME
 
 # ── Lazy imports (after env vars are set) ────────────────────────────────────
-from config import Config, RetrievalStrategy
+from config import RetrievalStrategy
 from document_processor import process_documents
-from embeddings import get_embeddings
 from llm import get_llm
 from observability import QueryTracer, configure_logging
 from rag_chain import create_rag_chain, verify_citations
@@ -470,9 +471,9 @@ if query:
         else:
             with tracer.stage("generate"):
                 # Format context manually so streaming works cleanly
-                from rag_chain import format_docs, RAG_PROMPT_TEMPLATE
-                from langchain_core.prompts import ChatPromptTemplate
                 from langchain_core.output_parsers import StrOutputParser
+                from langchain_core.prompts import ChatPromptTemplate
+                from rag_chain import RAG_PROMPT_TEMPLATE, format_docs
 
                 prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
                 stream_chain = prompt | _llm | StrOutputParser()

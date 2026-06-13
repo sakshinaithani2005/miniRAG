@@ -24,11 +24,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Ensure src/minirag is on the path
 _SRC = Path(__file__).resolve().parent.parent / "src" / "minirag"
@@ -75,7 +74,7 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _index_pdf(pdf_path: Path) -> List[Any]:
+def _index_pdf(pdf_path: Path) -> list[Any]:
     """Index a PDF and return the chunks."""
     print(f"📄 Indexing {pdf_path.name} …")
     from document_processor import process_documents
@@ -98,10 +97,10 @@ def _index_pdf(pdf_path: Path) -> List[Any]:
 
 
 def run_evaluation(
-    qa_pairs: List[Dict],
+    qa_pairs: list[dict],
     strategy: str = "hybrid",
-    corpus: Optional[List] = None,
-) -> Dict[str, Any]:
+    corpus: list | None = None,
+) -> dict[str, Any]:
     """
     Run RAGAS evaluation over a list of Q/A pairs.
 
@@ -114,7 +113,6 @@ def run_evaluation(
         Dict with per-metric scores and aggregate stats.
     """
     from config import RetrievalStrategy
-    from embeddings import get_embeddings
     from llm import get_llm
     from rag_chain import create_rag_chain, query_rag
     from retriever import create_retriever
@@ -127,10 +125,10 @@ def run_evaluation(
     chain = create_rag_chain(retriever, llm)
 
     # ── Collect responses ────────────────────────────────────────────────
-    questions: List[str] = []
-    answers: List[str] = []
-    contexts: List[List[str]] = []
-    ground_truths: List[str] = []
+    questions: list[str] = []
+    answers: list[str] = []
+    contexts: list[list[str]] = []
+    ground_truths: list[str] = []
 
     print(f"\n🔍 Running {len(qa_pairs)} queries with '{strategy}' retrieval …\n")
 
@@ -193,7 +191,7 @@ def run_evaluation(
         # Fallback: simple grounding check
         from rag_chain import verify_citations
 
-        total_warnings = sum(len(verify_citations(a, len(c))) for a, c in zip(answers, contexts))
+        total_warnings = sum(len(verify_citations(a, len(c))) for a, c in zip(answers, contexts, strict=False))
         scores = {
             "citation_warning_rate": round(total_warnings / len(answers), 4),
             "avg_contexts_retrieved": round(
@@ -207,7 +205,7 @@ def run_evaluation(
     return scores
 
 
-def _print_table(scores: Dict[str, Any]) -> None:
+def _print_table(scores: dict[str, Any]) -> None:
     print("\n" + "=" * 55)
     print("EVALUATION RESULTS")
     print("=" * 55)
@@ -231,7 +229,7 @@ def main() -> int:
     args = _parse_args()
 
     # Add src/minirag to path
-    import importlib, sys
+    import sys
     sys.path.insert(0, str(_SRC))
 
     from config import Config
