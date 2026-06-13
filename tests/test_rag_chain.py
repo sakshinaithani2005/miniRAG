@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
 sys.path.insert(0, str(_SRC))
@@ -17,7 +15,6 @@ sys.path.insert(0, str(_SRC.parent.parent))
 
 def test_format_docs_numbering():
     from langchain_core.documents import Document
-
     from rag_chain import format_docs
 
     docs = [
@@ -33,7 +30,6 @@ def test_format_docs_numbering():
 
 def test_format_docs_source_metadata():
     from langchain_core.documents import Document
-
     from rag_chain import format_docs
 
     docs = [Document(page_content="text", metadata={"source": "paper.pdf", "chunk_id": 5})]
@@ -44,7 +40,6 @@ def test_format_docs_source_metadata():
 
 def test_format_docs_missing_metadata():
     from langchain_core.documents import Document
-
     from rag_chain import format_docs
 
     docs = [Document(page_content="text", metadata={})]

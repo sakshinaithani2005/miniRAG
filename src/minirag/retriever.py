@@ -12,24 +12,20 @@ The active strategy is selected by the ``strategy`` argument to
 
 from __future__ import annotations
 
-from typing import List, Optional
-
+from config import Config, RetrievalStrategy
+from hybrid_retriever import BM25Index, HybridRetriever
 from langchain_community.document_compressors.flashrank_rerank import FlashrankRerank
 from langchain_core.documents import Document
 from langchain_pinecone import PineconeVectorStore
-
-from config import Config, RetrievalStrategy
-from hybrid_retriever import BM25Index, HybridRetriever
-
 
 # ---------------------------------------------------------------------------
 # Reranker singleton
 # ---------------------------------------------------------------------------
 
-_reranker_instance: Optional[FlashrankRerank] = None
+_reranker_instance: FlashrankRerank | None = None
 
 
-def get_reranker() -> Optional[FlashrankRerank]:
+def get_reranker() -> FlashrankRerank | None:
     """
     Return a cached FlashrankRerank instance.
 
@@ -42,7 +38,7 @@ def get_reranker() -> Optional[FlashrankRerank]:
     return _reranker_instance
 
 
-def _init_reranker() -> Optional[FlashrankRerank]:
+def _init_reranker() -> FlashrankRerank | None:
     try:
         reranker = FlashrankRerank(top_n=Config.RERANK_TOP_N)
         if hasattr(reranker, "model_rebuild"):
@@ -100,14 +96,14 @@ class _HybridWithRerank:
     def __init__(
         self,
         hybrid: HybridRetriever,
-        reranker: Optional[FlashrankRerank],
+        reranker: FlashrankRerank | None,
         top_n: int,
     ) -> None:
         self._hybrid = hybrid
         self._reranker = reranker
         self._top_n = top_n
 
-    def invoke(self, query: str) -> List[Document]:
+    def invoke(self, query: str) -> list[Document]:
         docs = self._hybrid.retrieve(query)
         if self._reranker is None:
             return docs[: self._top_n]
@@ -125,7 +121,7 @@ class _HybridWithRerank:
 
 def _hybrid_retriever(
     vectorstore: PineconeVectorStore,
-    corpus: List[Document],
+    corpus: list[Document],
     top_k: int,
 ) -> _HybridWithRerank:
     """Build a hybrid (dense + BM25 + RRF) retriever over the given corpus."""
@@ -140,8 +136,8 @@ def _hybrid_retriever(
 
 def create_retriever(
     vectorstore: PineconeVectorStore,
-    corpus: Optional[List[Document]] = None,
-    strategy: Optional[RetrievalStrategy] = None,
+    corpus: list[Document] | None = None,
+    strategy: RetrievalStrategy | None = None,
 ):
     """
     Build a retriever according to the chosen retrieval strategy.

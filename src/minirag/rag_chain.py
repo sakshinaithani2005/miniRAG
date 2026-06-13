@@ -14,14 +14,12 @@ All steps are instrumented via the QueryTracer for latency breakdown.
 from __future__ import annotations
 
 import re
-from typing import Generator, List, Optional, Tuple
+from collections.abc import Generator
 
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-
-from config import Config
 from observability import QueryTracer
 
 # ChatGoogleGenerativeAI imported lazily to avoid hard dep in tests
@@ -66,7 +64,7 @@ Rewritten query:\
 # Context formatting
 # ---------------------------------------------------------------------------
 
-def format_docs(documents: List[Document]) -> str:
+def format_docs(documents: list[Document]) -> str:
     """Format documents as numbered, source-labelled context blocks."""
     return "\n\n".join(
         f"[{i + 1}] {doc.page_content}\n"
@@ -108,7 +106,7 @@ def rewrite_query(question: str, llm) -> str:
 # Answer grounding check
 # ---------------------------------------------------------------------------
 
-def verify_citations(answer: str, num_docs: int) -> List[str]:
+def verify_citations(answer: str, num_docs: int) -> list[str]:
     """
     Parse citation markers from the answer and flag invalid ones.
 
@@ -167,8 +165,8 @@ def query_rag(
     *,
     enable_rewrite: bool = True,
     llm=None,
-    tracer: Optional[QueryTracer] = None,
-) -> Tuple[str, List[Document], List[str]]:
+    tracer: QueryTracer | None = None,
+) -> tuple[str, list[Document], list[str]]:
     """
     Execute a full RAG query with optional rewriting and citation checking.
 
@@ -189,7 +187,7 @@ def query_rag(
 
     if tracer:
         with tracer.stage("retrieve"):
-            retrieved_docs: List[Document] = retriever.invoke(retrieval_query)
+            retrieved_docs: list[Document] = retriever.invoke(retrieval_query)
     else:
         retrieved_docs = retriever.invoke(retrieval_query)
 
@@ -213,7 +211,7 @@ def query_rag(
 
 def stream_rag(
     chain,
-    retrieved_docs: List[Document],
+    retrieved_docs: list[Document],
     question: str,
 ) -> Generator:
     """
@@ -232,8 +230,8 @@ def stream_rag(
         Token generator — consume with ``st.write_stream()`` or iteration.
     """
     context_str = format_docs(retrieved_docs)
-    from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
 
     prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
     # Build a simple chain that does NOT include retrieval

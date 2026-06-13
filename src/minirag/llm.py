@@ -5,9 +5,8 @@ Handles Google Gemini LLM initialisation.
 
 from __future__ import annotations
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-
 from config import Config
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 def get_llm() -> ChatGoogleGenerativeAI:

@@ -72,7 +72,6 @@ def main() -> int:
     # Lazy imports after env is loaded
     from config import Config, RetrievalStrategy
     from document_processor import process_documents
-    from embeddings import get_embeddings
     from llm import get_llm
     from observability import QueryTracer, configure_logging
     from rag_chain import create_rag_chain, query_rag

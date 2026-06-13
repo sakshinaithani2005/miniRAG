@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Generator, Optional
 
 import structlog
 
@@ -88,7 +88,7 @@ class QueryTracer:
         return tracer.latency
     """
 
-    def __init__(self, query: str, logger: Optional[structlog.stdlib.BoundLogger] = None):
+    def __init__(self, query: str, logger: structlog.stdlib.BoundLogger | None = None):
         self.query = query
         self.latency = LatencyBreakdown()
         self._log = logger or get_logger()

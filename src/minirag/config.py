@@ -15,9 +15,8 @@ NOTE: streamlit is imported lazily so this module works in test/CLI
 from __future__ import annotations
 
 import os
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,7 +24,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]  # src/minirag/ -> repo root
 
 
-class RetrievalStrategy(str, Enum):
+class RetrievalStrategy(StrEnum):
     """Available retrieval strategies."""
 
     DENSE = "dense"    # Pinecone cosine similarity only
@@ -76,11 +75,11 @@ class Settings(BaseSettings):
     # ── Observability ─────────────────────────────────────────────────────────
     log_level: str = Field("INFO")
     enable_langsmith_tracing: bool = Field(False)
-    langsmith_api_key: Optional[str] = Field(None)
+    langsmith_api_key: str | None = Field(None)
     langsmith_project: str = Field("miniRAG")
 
     @model_validator(mode="after")
-    def _apply_streamlit_secrets(self) -> "Settings":
+    def _apply_streamlit_secrets(self) -> Settings:
         """Pull any missing values from st.secrets (Streamlit Cloud)."""
         try:
             import streamlit as st  # type: ignore  # noqa: PLC0415
@@ -96,7 +95,7 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def _configure_langsmith(self) -> "Settings":
+    def _configure_langsmith(self) -> Settings:
         if self.enable_langsmith_tracing and self.langsmith_api_key:
             os.environ["LANGCHAIN_TRACING_V2"] = "true"
             os.environ["LANGCHAIN_API_KEY"] = self.langsmith_api_key
@@ -116,7 +115,7 @@ def get_settings() -> Settings:
 class Config:
     """Backward-compatible shim. New code should use ``get_settings()``."""
 
-    _s: Optional[Settings] = None
+    _s: Settings | None = None
 
     @classmethod
     def _settings(cls) -> Settings:
@@ -137,21 +136,21 @@ class Config:
     SNIPPET_LENGTH = 200
 
     @classmethod
-    def get_google_api_key(cls) -> Optional[str]:
+    def get_google_api_key(cls) -> str | None:
         try:
             return cls._settings().google_api_key or os.getenv("GOOGLE_API_KEY")
         except Exception:
             return os.getenv("GOOGLE_API_KEY")
 
     @classmethod
-    def get_pinecone_api_key(cls) -> Optional[str]:
+    def get_pinecone_api_key(cls) -> str | None:
         try:
             return cls._settings().pinecone_api_key or os.getenv("PINECONE_API_KEY")
         except Exception:
             return os.getenv("PINECONE_API_KEY")
 
     @classmethod
-    def get_pinecone_index_name(cls) -> Optional[str]:
+    def get_pinecone_index_name(cls) -> str | None:
         try:
             return cls._settings().pinecone_index_name or os.getenv("PINECONE_INDEX_NAME", "mini-rag")
         except Exception:

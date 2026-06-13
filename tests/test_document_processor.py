@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import io
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 # Ensure src/minirag is importable in tests
 import sys
 from pathlib import Path
+
+import pytest
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
 sys.path.insert(0, str(_SRC))
@@ -76,9 +73,8 @@ def test_load_text_from_string_metadata():
 # ── chunk_documents ───────────────────────────────────────────────────────────
 
 def test_chunk_documents_splits_long_text():
-    from langchain_core.documents import Document
-
     from document_processor import chunk_documents
+    from langchain_core.documents import Document
 
     long_text = "word " * 600  # > 1000 chars
     docs = [Document(page_content=long_text, metadata={"source": "test"})]
@@ -87,9 +83,8 @@ def test_chunk_documents_splits_long_text():
 
 
 def test_chunk_documents_preserves_metadata():
-    from langchain_core.documents import Document
-
     from document_processor import chunk_documents
+    from langchain_core.documents import Document
 
     doc = Document(page_content="short text", metadata={"source": "test", "file_hash": "abc123"})
     chunks = chunk_documents([doc])
@@ -123,11 +118,11 @@ def test_process_documents_chunk_ids_sequential():
 
 
 def test_process_documents_snippet_length():
-    from document_processor import process_documents
     from config import Config
+    from document_processor import process_documents
 
     chunks = process_documents(input_text="x " * 500)
     for c in chunks:
         snippet = c.metadata["source_snippet"]
         # snippet body (before "...") <= SNIPPET_LENGTH
-        assert len(snippet.rstrip("...")) <= Config.SNIPPET_LENGTH + 10  # small tolerance
+        assert len(snippet.removesuffix("...")) <= Config.SNIPPET_LENGTH + 10  # small tolerance

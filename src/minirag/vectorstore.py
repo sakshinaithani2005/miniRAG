@@ -5,16 +5,12 @@ Handles Pinecone vector store initialization and document operations.
 
 from __future__ import annotations
 
-import os
 import time
-from typing import List, Optional
 
+from config import Config
 from langchain_core.documents import Document
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
-
-from config import Config
-
 
 # ---------------------------------------------------------------------------
 # Initialisation
@@ -66,8 +62,8 @@ def get_vectorstore() -> PineconeVectorStore:
 # ---------------------------------------------------------------------------
 
 def add_documents_to_vectorstore(
-    documents: List[Document],
-    vectorstore: Optional[PineconeVectorStore] = None,
+    documents: list[Document],
+    vectorstore: PineconeVectorStore | None = None,
 ) -> int:
     """
     Upload chunked documents to Pinecone.
@@ -121,7 +117,7 @@ def add_documents_to_vectorstore(
 # Utility
 # ---------------------------------------------------------------------------
 
-def clear_vectorstore(vectorstore: Optional[PineconeVectorStore] = None) -> None:
+def clear_vectorstore(vectorstore: PineconeVectorStore | None = None) -> None:
     """Delete all vectors from the default namespace."""
     try:
         pinecone_api_key = Config.get_pinecone_api_key()

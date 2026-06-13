@@ -15,18 +15,14 @@ Reference: Cormack, Clarke & Buettcher (2009) — Reciprocal Rank Fusion
 
 from __future__ import annotations
 
-import math
-from typing import List
-
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
-
 
 # ---------------------------------------------------------------------------
 # BM25 helpers
 # ---------------------------------------------------------------------------
 
-def _tokenize(text: str) -> List[str]:
+def _tokenize(text: str) -> list[str]:
     """Simple whitespace + lowercase tokenizer for BM25."""
     return text.lower().split()
 
@@ -34,19 +30,19 @@ def _tokenize(text: str) -> List[str]:
 class BM25Index:
     """Lightweight BM25 wrapper over a fixed corpus of Document objects."""
 
-    def __init__(self, documents: List[Document]) -> None:
+    def __init__(self, documents: list[Document]) -> None:
         self.documents = documents
         tokenized = [_tokenize(d.page_content) for d in documents]
         self._bm25 = BM25Okapi(tokenized)
 
-    def get_scores(self, query: str) -> List[float]:
+    def get_scores(self, query: str) -> list[float]:
         """Return BM25 scores for all documents given a query string."""
         return list(self._bm25.get_scores(_tokenize(query)))
 
-    def get_top_n(self, query: str, n: int = 10) -> List[Document]:
+    def get_top_n(self, query: str, n: int = 10) -> list[Document]:
         """Return the top-n documents ranked by BM25 score."""
         scores = self.get_scores(query)
-        ranked = sorted(zip(scores, self.documents), key=lambda x: x[0], reverse=True)
+        ranked = sorted(zip(scores, self.documents, strict=False), key=lambda x: x[0], reverse=True)
         return [doc for _, doc in ranked[:n]]
 
 
@@ -55,9 +51,9 @@ class BM25Index:
 # ---------------------------------------------------------------------------
 
 def reciprocal_rank_fusion(
-    ranked_lists: List[List[Document]],
+    ranked_lists: list[list[Document]],
     k: int = 60,
-) -> List[Document]:
+) -> list[Document]:
     """
     Fuse multiple ranked document lists using Reciprocal Rank Fusion.
 
@@ -126,7 +122,7 @@ class HybridRetriever:
         self._top_k = top_k
         self._rrf_k = rrf_k
 
-    def retrieve(self, query: str) -> List[Document]:
+    def retrieve(self, query: str) -> list[Document]:
         """
         Retrieve documents using hybrid RRF over dense + sparse results.
 
@@ -137,12 +133,12 @@ class HybridRetriever:
             Merged, deduplicated list of Documents ordered by RRF score.
         """
         # Dense retrieval (double the candidates to give RRF more to work with)
-        dense_docs: List[Document] = self._vs.similarity_search(
+        dense_docs: list[Document] = self._vs.similarity_search(
             query, k=self._top_k * 2
         )
 
         # Sparse retrieval
-        sparse_docs: List[Document] = self._bm25.get_top_n(query, n=self._top_k * 2)
+        sparse_docs: list[Document] = self._bm25.get_top_n(query, n=self._top_k * 2)
 
         # Fuse
         fused = reciprocal_rank_fusion(
@@ -168,7 +164,7 @@ class _LangChainRetrieverAdapter:
     def __init__(self, hybrid: HybridRetriever) -> None:
         self._hybrid = hybrid
 
-    def invoke(self, query: str) -> List[Document]:  # noqa: D102
+    def invoke(self, query: str) -> list[Document]:  # noqa: D102
         return self._hybrid.retrieve(query)
 
     def __or__(self, other):

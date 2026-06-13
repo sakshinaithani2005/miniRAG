@@ -10,12 +10,10 @@ Requires: ``duckduckgo-search`` (pip install duckduckgo-search)
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from langchain_core.documents import Document
 
 
-def web_search(query: str, max_results: int = 3) -> List[Document]:
+def web_search(query: str, max_results: int = 3) -> list[Document]:
     """
     Run a DuckDuckGo search and return results as Document objects.
 
@@ -33,7 +31,7 @@ def web_search(query: str, max_results: int = 3) -> List[Document]:
         print("⚠️  duckduckgo-search not installed. Run: pip install duckduckgo-search")
         return []
 
-    results: List[Document] = []
+    results: list[Document] = []
     try:
         with DDGS() as ddgs:
             for r in ddgs.text(query, max_results=max_results):
@@ -53,7 +51,7 @@ def web_search(query: str, max_results: int = 3) -> List[Document]:
     return results
 
 
-def should_fallback(retrieved_docs: List[Document], threshold: float = 0.30) -> bool:
+def should_fallback(retrieved_docs: list[Document], threshold: float = 0.30) -> bool:
     """
     Decide whether to trigger the web-search fallback.
 
@@ -88,11 +86,11 @@ def should_fallback(retrieved_docs: List[Document], threshold: float = 0.30) -> 
 
 
 def augment_with_web(
-    retrieved_docs: List[Document],
+    retrieved_docs: list[Document],
     query: str,
     max_results: int = 3,
     threshold: float = 0.30,
-) -> List[Document]:
+) -> list[Document]:
     """
     Optionally augment retrieved docs with web search results.
 

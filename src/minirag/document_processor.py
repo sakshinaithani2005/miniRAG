@@ -10,14 +10,11 @@ from __future__ import annotations
 import hashlib
 import os
 import tempfile
-from typing import List, Optional
 
+from config import Config
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-from config import Config
-
 
 # ---------------------------------------------------------------------------
 # File-hash deduplication helper
@@ -32,7 +29,7 @@ def compute_file_hash(content: bytes) -> str:
 # Loaders
 # ---------------------------------------------------------------------------
 
-def load_document_from_file(uploaded_file) -> List[Document]:
+def load_document_from_file(uploaded_file) -> list[Document]:
     """
     Load a document from a Streamlit uploaded file object.
 
@@ -64,10 +61,10 @@ def load_document_from_file(uploaded_file) -> List[Document]:
             try:
                 from langchain_community.document_loaders import Docx2txtLoader  # noqa
                 loader = Docx2txtLoader(tmp_path)
-            except ImportError:
+            except ImportError as e:
                 raise ImportError(
                     "DOCX support requires 'docx2txt'. Install with: pip install docx2txt"
-                )
+                ) from e
         else:
             loader = TextLoader(tmp_path, autodetect_encoding=True)
 
@@ -93,7 +90,7 @@ def _suffix(mime_type: str, file_name: str) -> str:
 
 def load_text_from_string(
     text: str, source_name: str = "pasted_text"
-) -> List[Document]:
+) -> list[Document]:
     """
     Wrap a raw text string as a single Document.
 
@@ -118,10 +115,10 @@ def load_text_from_string(
 # ---------------------------------------------------------------------------
 
 def chunk_documents(
-    documents: List[Document],
-    chunk_size: Optional[int] = None,
-    chunk_overlap: Optional[int] = None,
-) -> List[Document]:
+    documents: list[Document],
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
+) -> list[Document]:
     """
     Split documents into overlapping chunks.
 
@@ -147,8 +144,8 @@ def chunk_documents(
 
 def process_documents(
     uploaded_file=None,
-    input_text: Optional[str] = None,
-) -> List[Document]:
+    input_text: str | None = None,
+) -> list[Document]:
     """
     Complete document processing pipeline: load → chunk → enrich metadata.
 
