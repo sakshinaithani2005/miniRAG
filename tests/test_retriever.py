@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from langchain_core.documents import Document
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"

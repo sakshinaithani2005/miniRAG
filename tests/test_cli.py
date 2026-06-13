@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
 if str(_SRC) not in sys.path:
