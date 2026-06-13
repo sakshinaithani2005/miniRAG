@@ -10,22 +10,22 @@ import sys
 import time
 from pathlib import Path
 
-# ── Path setup: resolve src/minirag package ──────────────────────────────────
+# ── Path setup ────────────────────────────────────────────────────────────────
 _ROOT = Path(__file__).resolve().parent
 _SRC = _ROOT / "src" / "minirag"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
-# Also keep repo-root flat imports working (legacy)
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
+# src/minirag MUST be first so it wins over stale flat-root files
+for _p in [str(_SRC), str(_ROOT)]:
+    if _p in sys.path:
+        sys.path.remove(_p)
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_SRC))
 
 from dotenv import load_dotenv
-
 load_dotenv(_ROOT / ".env", override=True)
 
 import streamlit as st
 
-# ── Page config (MUST be first Streamlit call) ───────────────────────────────
+# ── Page config (MUST be first Streamlit call) ────────────────────────────────
 st.set_page_config(
     page_title="miniRAG · Gemini + Pinecone",
     page_icon="🧠",
@@ -38,23 +38,18 @@ st.set_page_config(
     },
 )
 
-# ── Custom CSS — dark glassmorphism theme ────────────────────────────────────
+# ── Custom CSS — dark glassmorphism theme ─────────────────────────────────────
 st.markdown(
     """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-}
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-/* === Background === */
 .stApp {
     background: linear-gradient(135deg, #0f0c29 0%, #131a3a 50%, #1a0533 100%);
     min-height: 100vh;
 }
-
-/* === Glassmorphism cards === */
 .glass-card {
     background: rgba(255,255,255,0.06);
     backdrop-filter: blur(16px);
@@ -67,14 +62,11 @@ html, body, [class*="css"] {
 }
 .glass-card:hover { border-color: rgba(139,92,246,0.5); }
 
-/* === Sidebar === */
 [data-testid="stSidebar"] {
     background: rgba(15,12,41,0.85) !important;
     border-right: 1px solid rgba(139,92,246,0.25) !important;
     backdrop-filter: blur(20px);
 }
-
-/* === Primary button === */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
     border: none !important;
@@ -88,8 +80,6 @@ html, body, [class*="css"] {
     transform: translateY(-2px) !important;
     box-shadow: 0 8px 24px rgba(139,92,246,0.45) !important;
 }
-
-/* === Chat messages === */
 [data-testid="stChatMessage"] {
     background: rgba(255,255,255,0.05) !important;
     border: 1px solid rgba(255,255,255,0.08) !important;
@@ -101,30 +91,22 @@ html, body, [class*="css"] {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-
-/* === Chat input === */
 [data-testid="stChatInput"] > div {
     background: rgba(255,255,255,0.07) !important;
     border: 1px solid rgba(139,92,246,0.4) !important;
     border-radius: 12px !important;
 }
-
-/* === Metrics === */
 [data-testid="stMetric"] {
     background: rgba(255,255,255,0.05);
     border-radius: 12px;
     padding: 0.75rem 1rem;
     border: 1px solid rgba(255,255,255,0.08);
 }
-
-/* === Expander === */
 [data-testid="stExpander"] {
     background: rgba(255,255,255,0.04) !important;
     border: 1px solid rgba(255,255,255,0.08) !important;
     border-radius: 12px !important;
 }
-
-/* === Badges / tags === */
 .tag {
     display: inline-block;
     background: rgba(139,92,246,0.2);
@@ -142,8 +124,6 @@ html, body, [class*="css"] {
     border-color: rgba(16,185,129,0.5);
     color: #6ee7b7;
 }
-
-/* === Latency bar === */
 .latency-bar-wrap { margin: 0.5rem 0 1rem; }
 .latency-label { font-size: 0.72rem; color: #a78bfa; margin-bottom: 4px; }
 .latency-bar {
@@ -153,8 +133,6 @@ html, body, [class*="css"] {
     margin-bottom: 6px;
     transition: width 0.5s ease;
 }
-
-/* === Warning === */
 .grounding-warn {
     background: rgba(234,179,8,0.1);
     border: 1px solid rgba(234,179,8,0.4);
@@ -170,7 +148,7 @@ html, body, [class*="css"] {
 )
 
 
-# ── Secret resolution ────────────────────────────────────────────────────────
+# ── Secret resolution ─────────────────────────────────────────────────────────
 def _secret(key: str, default: str | None = None) -> str | None:
     try:
         v = st.secrets.get(key)
@@ -192,58 +170,62 @@ if not GOOGLE_API_KEY or not PINECONE_API_KEY:
     )
     st.stop()
 
-# Propagate keys so downstream modules find them via os.getenv
-os.environ.setdefault("GOOGLE_API_KEY", GOOGLE_API_KEY)
-os.environ.setdefault("PINECONE_API_KEY", PINECONE_API_KEY)
-os.environ.setdefault("PINECONE_INDEX_NAME", PINECONE_INDEX_NAME)
+# Use os.environ[] (not setdefault) so keys are always current
+os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
+os.environ["PINECONE_INDEX_NAME"] = PINECONE_INDEX_NAME
 
-# ── Lazy imports (after env is ready) ────────────────────────────────────────
+# ── Lazy imports (after env vars are set) ────────────────────────────────────
 from config import Config, RetrievalStrategy
 from document_processor import process_documents
 from embeddings import get_embeddings
 from llm import get_llm
 from observability import QueryTracer, configure_logging
-from rag_chain import create_rag_chain, stream_rag
+from rag_chain import create_rag_chain, verify_citations
 from retriever import create_retriever
 from vectorstore import add_documents_to_vectorstore, get_vectorstore
 
 configure_logging()
 
+
 # ── Session state bootstrap ───────────────────────────────────────────────────
 _DEFAULTS = {
-    "chat_history": [],          # list[dict] — {role, content, sources, latency, warnings}
+    "chat_history": [],
     "indexed": False,
     "chunks": [],
     "chunks_count": 0,
     "doc_name": "",
-    "feedback": {},              # {msg_idx: "up"|"down"}
+    "feedback": {},
     "strategy": RetrievalStrategy.HYBRID.value,
+    "enable_rewrite": True,
+    "enable_web_fallback": False,
 }
 for k, v in _DEFAULTS.items():
     st.session_state.setdefault(k, v)
 
 
-# ── Cached component initialisation ─────────────────────────────────────────
+# ── Cached heavy singletons ───────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
-def _init_components():
-    """Load heavy singletons once per server process."""
-    return {
-        "embeddings": get_embeddings(),
-        "llm": get_llm(),
-        "vectorstore": get_vectorstore(),
-    }
+def _get_llm():
+    return get_llm()
+
+
+@st.cache_resource(show_spinner=False)
+def _get_vectorstore():
+    return get_vectorstore()
 
 
 try:
-    components = _init_components()
+    _llm = _get_llm()
+    _vs = _get_vectorstore()
 except Exception as exc:
     st.error(f"❌ **Initialisation failed:** {exc}")
     st.stop()
 
 
-# ── Helper: render latency bars ───────────────────────────────────────────────
+# ── Helper: latency bars ──────────────────────────────────────────────────────
 def _latency_bars(latency: dict) -> str:
-    total = latency.get("total_ms", 1) or 1
+    total = max(latency.get("total_ms", 1), 1)
     rows = ""
     for stage, label in [
         ("retrieve_ms", "🔍 Retrieve"),
@@ -260,7 +242,7 @@ def _latency_bars(latency: dict) -> str:
     return f'<div class="latency-bar-wrap">{rows}</div>'
 
 
-# ── Header ───────────────────────────────────────────────────────────────────
+# ── Header ────────────────────────────────────────────────────────────────────
 col_title, col_badges = st.columns([3, 1])
 with col_title:
     st.markdown(
@@ -279,9 +261,9 @@ with col_badges:
 
 st.divider()
 
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # SIDEBAR — Document ingestion + settings
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### 📄 Load Document")
     st.caption("Upload a file or paste text to index it into Pinecone.")
@@ -291,24 +273,42 @@ with st.sidebar:
         type=["pdf", "txt", "docx"],
         label_visibility="collapsed",
     )
-    input_text = st.text_area("…or paste text", height=120, placeholder="Paste your document here")
+    input_text = st.text_area(
+        "…or paste text", height=120,
+        placeholder="Paste your document here",
+    )
 
     st.markdown("---")
     st.markdown("### ⚙️ Retrieval Settings")
+
     chosen_strategy = st.radio(
         "Strategy",
         options=[s.value for s in RetrievalStrategy],
         index=1,  # default: hybrid
-        format_func=lambda s: {"dense": "Dense (cosine)", "hybrid": "Hybrid (BM25 + RRF)", "mmr": "MMR (diversity)"}[s],
-        horizontal=False,
+        format_func=lambda s: {
+            "dense":  "Dense (cosine)",
+            "hybrid": "Hybrid (BM25 + RRF)",
+            "mmr":    "MMR (diversity)",
+        }[s],
     )
+    # Always keep session state in sync with the widget
     st.session_state.strategy = chosen_strategy
 
-    enable_rewrite = st.toggle("Query rewriting (HyDE-lite)", value=True)
-    enable_web_fallback = st.toggle("Web search fallback", value=False)
+    enable_rewrite = st.toggle(
+        "Query rewriting (HyDE-lite)",
+        value=st.session_state.enable_rewrite,
+    )
+    st.session_state.enable_rewrite = enable_rewrite
+
+    enable_web_fallback = st.toggle(
+        "Web search fallback",
+        value=st.session_state.enable_web_fallback,
+    )
+    st.session_state.enable_web_fallback = enable_web_fallback
 
     st.markdown("---")
 
+    # ── Index Document button ─────────────────────────────────────────────────
     if st.button("📤 Index Document", use_container_width=True, type="primary"):
         if not input_text and not uploaded_file:
             st.warning("Provide text or upload a file first.")
@@ -316,13 +316,17 @@ with st.sidebar:
             with st.spinner("Chunking, embedding & indexing…"):
                 try:
                     t0 = time.perf_counter()
+
                     chunks = process_documents(
                         uploaded_file=uploaded_file,
                         input_text=input_text or None,
                     )
-                    num = add_documents_to_vectorstore(chunks, components["vectorstore"])
+
+                    # Upload to Pinecone — pass the cached vectorstore
+                    num = add_documents_to_vectorstore(chunks, _vs)
                     elapsed = time.perf_counter() - t0
 
+                    # Persist chunks in session state so BM25 can use them
                     st.session_state.chunks = chunks
                     st.session_state.chunks_count = num
                     st.session_state.indexed = True
@@ -332,6 +336,8 @@ with st.sidebar:
                     st.session_state.chat_history = []  # fresh chat for new doc
 
                     st.success(f"✅ {num} chunks indexed in {elapsed:.2f}s")
+                    st.rerun()   # ← force UI refresh so the chat area appears
+
                 except Exception as exc:
                     st.error(f"❌ **Indexing failed:** {exc}")
 
@@ -339,7 +345,7 @@ with st.sidebar:
         st.info(
             f"📚 **{st.session_state.doc_name}**\n\n"
             f"{st.session_state.chunks_count} chunks · "
-            f"{chosen_strategy} retrieval"
+            f"{st.session_state.strategy} retrieval"
         )
 
     st.markdown("---")
@@ -348,9 +354,9 @@ with st.sidebar:
         st.rerun()
 
 
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # MAIN — Chat interface
-# ────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 if not st.session_state.indexed:
     st.markdown(
         '<div class="glass-card">'
@@ -368,18 +374,16 @@ if not st.session_state.indexed:
     )
     st.stop()
 
-# ── Render existing chat history ─────────────────────────────────────────────
+# ── Render existing chat history ──────────────────────────────────────────────
 for idx, msg in enumerate(st.session_state.chat_history):
     with st.chat_message(msg["role"], avatar="🧠" if msg["role"] == "assistant" else "👤"):
         st.markdown(msg["content"])
 
         if msg["role"] == "assistant":
-            # Latency breakdown
             if msg.get("latency"):
                 with st.expander("⏱ Latency breakdown", expanded=False):
                     st.markdown(_latency_bars(msg["latency"]), unsafe_allow_html=True)
 
-            # Sources
             if msg.get("sources"):
                 with st.expander(f"📚 Sources ({len(msg['sources'])} chunks)", expanded=False):
                     for i, doc in enumerate(msg["sources"], 1):
@@ -397,12 +401,9 @@ for idx, msg in enumerate(st.session_state.chat_history):
                         if "page" in doc.metadata:
                             st.caption(f"Page {doc.metadata['page']}")
 
-            # Grounding warnings
             for w in msg.get("warnings", []):
                 st.markdown(f'<div class="grounding-warn">{w}</div>', unsafe_allow_html=True)
 
-            # Feedback
-            fb_key = f"fb_{idx}"
             current_fb = st.session_state.feedback.get(idx)
             c1, c2, _ = st.columns([1, 1, 8])
             with c1:
@@ -414,55 +415,80 @@ for idx, msg in enumerate(st.session_state.chat_history):
                     st.session_state.feedback[idx] = "down"
                     st.rerun()
             if current_fb:
-                st.caption("✅ Thanks for your feedback!" if current_fb == "up" else "📝 Noted — we'll improve.")
+                st.caption("✅ Thanks!" if current_fb == "up" else "📝 Noted.")
 
-# ── Chat input ───────────────────────────────────────────────────────────────
+
+# ── Chat input ────────────────────────────────────────────────────────────────
 query = st.chat_input("Ask a question about the document…")
 
 if query:
-    # Store user message
+    # Persist user message first so it shows immediately
     st.session_state.chat_history.append({"role": "user", "content": query})
     with st.chat_message("user", avatar="👤"):
         st.markdown(query)
 
-    # Build retriever for this turn
+    # Read settings from session state (always current, even after sidebar rerun)
     strategy_enum = RetrievalStrategy(st.session_state.strategy)
-    retriever = create_retriever(
-        components["vectorstore"],
-        corpus=st.session_state.chunks or None,
-        strategy=strategy_enum,
-    )
-    chain = create_rag_chain(retriever, components["llm"])
+    _enable_rewrite = st.session_state.enable_rewrite
+    _enable_web_fallback = st.session_state.enable_web_fallback
+
+    # Corpus for BM25 — must be a non-empty list for HYBRID to work
+    corpus = st.session_state.chunks if st.session_state.chunks else None
+
     tracer = QueryTracer(query)
 
     with st.chat_message("assistant", avatar="🧠"):
-        with tracer.stage("generate"):
-            token_stream, retrieved_docs = stream_rag(
-                chain,
-                retriever,
-                query,
-                enable_rewrite=enable_rewrite,
-                llm=components["llm"] if enable_rewrite else None,
+        # ── Step 1: Build retriever ───────────────────────────────────────────
+        retriever = create_retriever(_vs, corpus=corpus, strategy=strategy_enum)
+
+        # ── Step 2: Retrieve docs ─────────────────────────────────────────────
+        retrieval_query = query
+        if _enable_rewrite:
+            from rag_chain import rewrite_query
+            with tracer.stage("embed"):
+                retrieval_query = rewrite_query(query, _llm)
+
+        with tracer.stage("retrieve"):
+            retrieved_docs = retriever.invoke(retrieval_query)
+
+        # Web fallback when Pinecone returns nothing useful
+        if _enable_web_fallback:
+            from web_search import augment_with_web
+            retrieved_docs = augment_with_web(retrieved_docs, query)
+
+        # ── Step 3: Build chain and stream answer ─────────────────────────────
+        chain = create_rag_chain(retriever, _llm)
+
+        if not retrieved_docs:
+            # No context — tell the user clearly rather than wasting LLM tokens
+            answer = (
+                "⚠️ **No relevant chunks were retrieved from the document.** "
+                "This usually means the document hasn't been indexed yet, or the "
+                "question doesn't match the content. Try re-indexing the document."
             )
+            st.markdown(answer)
+        else:
+            with tracer.stage("generate"):
+                # Format context manually so streaming works cleanly
+                from rag_chain import format_docs, RAG_PROMPT_TEMPLATE
+                from langchain_core.prompts import ChatPromptTemplate
+                from langchain_core.output_parsers import StrOutputParser
 
-            # Web fallback
-            if enable_web_fallback:
-                from web_search import augment_with_web
-                retrieved_docs = augment_with_web(retrieved_docs, query)
-
-            answer = st.write_stream(token_stream)
+                prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
+                stream_chain = prompt | _llm | StrOutputParser()
+                context_str = format_docs(retrieved_docs)
+                token_stream = stream_chain.stream(
+                    {"context": context_str, "question": query}
+                )
+                answer = st.write_stream(token_stream)
 
         latency_dict = tracer.latency.as_dict()
-
-        # Grounding check
-        from rag_chain import verify_citations
         warnings = verify_citations(answer, len(retrieved_docs))
 
-        # Latency expander
+        # ── Display latency / sources / warnings ──────────────────────────────
         with st.expander("⏱ Latency breakdown", expanded=False):
             st.markdown(_latency_bars(latency_dict), unsafe_allow_html=True)
 
-        # Sources expander
         if retrieved_docs:
             with st.expander(f"📚 Sources ({len(retrieved_docs)} chunks)", expanded=False):
                 for i, doc in enumerate(retrieved_docs, 1):
@@ -475,8 +501,9 @@ if query:
                         unsafe_allow_html=True,
                     )
                     st.caption(doc.metadata.get("source_snippet", doc.page_content[:200]))
+                    if "page" in doc.metadata:
+                        st.caption(f"Page {doc.metadata['page']}")
 
-        # Grounding warnings
         for w in warnings:
             st.markdown(f'<div class="grounding-warn">{w}</div>', unsafe_allow_html=True)
 
@@ -497,4 +524,8 @@ if query:
         "warnings": warnings,
     })
 
-    tracer.log(num_docs=len(retrieved_docs), strategy=st.session_state.strategy)
+    tracer.log(
+        num_docs=len(retrieved_docs),
+        strategy=st.session_state.strategy,
+        query_rewritten=(retrieval_query != query),
+    )
