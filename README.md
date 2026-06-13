@@ -1,6 +1,6 @@
 # 🧠 miniRAG
 
-> **Production-grade Retrieval-Augmented Generation** with Gemini, Pinecone, Hybrid Search, and RAGAS Evaluation.
+> **Production-grade, modular Retrieval-Augmented Generation (RAG) system** built with Gemini, Pinecone Serverless, hybrid search (BM25 + Dense), Reciprocal Rank Fusion (RRF), Cross-Encoder reranking, and automated RAGAS evaluation.
 
 [![CI](https://github.com/sakshinaithani2005/miniRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/sakshinaithani2005/miniRAG/actions)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
@@ -9,262 +9,248 @@
 
 ---
 
-## What Is This?
+## 🚀 Overview
 
-miniRAG is an end-to-end, production-ready RAG system that demonstrates every layer of the modern LLM application stack:
+**miniRAG** is a highly optimized, modular RAG pipeline engineered for SDE and LLM engineering resumes. It showcases modern best practices in LLM orchestration, vector databases, multi-stage retrieval, observability, and automated evaluation.
 
-| Layer | Tech |
-|---|---|
-| **Embeddings** | `gemini-embedding-001` (3072-dim) |
-| **Vector Store** | Pinecone Serverless (per-doc namespacing) |
-| **Sparse Retrieval** | BM25 (`rank-bm25`) |
-| **Fusion** | Reciprocal Rank Fusion (RRF) |
-| **Reranking** | FlashRank (zero-cost, CPU cross-encoder) |
-| **Generation** | `gemini-2.5-flash` (streaming) |
-| **Query Rewriting** | HyDE-lite via Gemini |
-| **Web Fallback** | DuckDuckGo (agentic retrieval) |
-| **Evaluation** | RAGAS (Faithfulness, Relevancy, Precision, Recall) |
-| **Observability** | structlog (JSON), per-stage latency breakdown |
-| **Frontend** | Streamlit (dark glassmorphism, chat UI) |
-| **CLI** | `python -m minirag.cli` |
-| **Tests** | pytest + pytest-cov (≥70% coverage) |
-| **CI** | GitHub Actions (lint → typecheck → test) |
-| **Packaging** | Docker + docker-compose |
+### Key Architectural Layers
+
+| Layer | Technology | Engineering Rationale |
+|---|---|---|
+| **Frontend** | Streamlit | Responsive dark glassmorphic UI showcasing latency breakdowns, grounding checks, and real-time streaming. |
+| **Embeddings** | `gemini-embedding-001` (3072-dim) | High-dimension embeddings for capturing subtle semantic contexts. |
+| **Vector Store** | Pinecone Serverless | Low-latency cloud search featuring **strict namespace isolation** to prevent data cross-contamination. |
+| **Sparse Retrieval** | BM25 (`rank-bm25`) | In-memory lexical scoring to guarantee exact matches for key terms (e.g. codes, IDs, proper nouns). |
+| **Rank Fusion** | Reciprocal Rank Fusion (RRF) | Merges sparse and dense candidate lists using parameter-free ranking. Resolves collisions using composite keys (`file_hash` + `chunk_id`). |
+| **Reranking** | FlashRank Cross-Encoder | Local, zero-cost CPU-optimized Cross-Encoder (`ms-marco-MultiBERT-L-12`) that reduces query window sizes from 20 to 5 candidates. |
+| **LLM Generation** | `gemini-2.5-flash` | Ultra-fast generation with support for live streaming and citation markers. |
+| **Query Rewriting** | HyDE-lite (Gemini) | Automatically reframes vague queries into highly descriptive target passages to maximize vector retrieval recall. |
+| **Web Fallback** | DuckDuckGo API | Agentic fallback mechanism that triggers a live web search if retrieval confidence scores fall below a minimum relevance threshold. |
+| **Evaluation** | RAGAS Framework | Measures system performance across four key axes: Faithfulness, Answer Relevancy, Context Precision, and Context Recall. |
+| **Observability** | `structlog` | Structured JSON logging providing a granular, per-stage latency breakdown. |
 
 ---
 
-## Architecture
+## 📐 Pipeline Architecture
 
 ```mermaid
 flowchart TD
     A[User Query] --> B{Query Rewriting\nHyDE-lite}
-    B --> C[Embed with Gemini]
+    B --> C[Gemini Embeddings]
     C --> D[Pinecone\nDense Retrieval k=10]
     C --> E[BM25\nSparse Retrieval k=10]
-    D --> F[Reciprocal Rank Fusion]
+    D --> F[Reciprocal Rank Fusion\nRRF]
     E --> F
-    F --> G[FlashRank Reranking\ntop-5]
-    G --> H{Score < threshold?}
-    H -- yes --> I[DuckDuckGo\nWeb Fallback]
-    H -- no --> J[Format Context\n+ Citations]
+    F --> G[FlashRank Reranker\ntop-5]
+    G --> H{Mean Score < Threshold?}
+    H -- Yes --> I[DuckDuckGo Web Search\nWeb Fallback]
+    H -- No --> J[Format Context\n+ Citations]
     I --> J
     J --> K[Gemini-2.5-flash\nGeneration with Streaming]
-    K --> L[Answer + Citations]
-    L --> M[Grounding Check]
-    M --> N[structlog\nLatency Breakdown]
+    K --> L[Answer + Citation Grounding]
+    L --> M[Structured logs\nLatency Breakdown]
 ```
 
 ---
 
-## RAG Pipeline Details
+## 💎 Advanced Features
 
-### 1. Hybrid Retrieval (BM25 + Dense + RRF)
+### 1. Hybrid Search & RRF Fusion
+To achieve optimal retrieval quality, miniRAG merges **Dense Search** (semantic context) and **Sparse Search** (keyword match). The fusion is managed by Reciprocal Rank Fusion (RRF) with a standard constant ($k=60$):
+$$\text{Score}(d \in D) = \sum_{m \in M} \frac{1}{60 + \text{rank}_m(d)}$$
+A custom **composite key** (`file_hash` + `chunk_id`) prevents document collisions during RRF fusion when processing multiple uploaded files.
 
-Pure dense search misses exact keyword matches (product codes, author names, model numbers). Hybrid retrieval combines:
-- **Dense**: Gemini cosine similarity — semantic understanding
-- **Sparse**: BM25 — keyword precision
-- **RRF**: `score = Σ 1/(60 + rank_i)` — parameter-free fusion
+### 2. Multi-Stage Reranking
+To combat the "lost in the middle" LLM behavior, the pipeline routes the top 20 candidate chunks through a local CPU-bound **FlashRank Cross-Encoder**. This reranker evaluates candidate pairs directly, shrinking the context window down to the 5 most critical chunks before LLM generation.
 
-### 2. HyDE-lite Query Rewriting
+### 3. Agentic Web Fallback
+When a query targets information outside the indexed documents, retrieval confidence drops. miniRAG dynamically detects this by analyzing the relevance scores of retrieved chunks:
+- If scores fall below `Config.WEB_FALLBACK_THRESHOLD` (or fewer than 2 chunks are found), the pipeline automatically triggers a fallback search using DuckDuckGo.
+- This results in augmented answers without manual intervention, avoiding empty or hallucinated responses.
 
-Before hitting the vector store, vague user queries are rewritten by Gemini into precise, retrieval-optimised queries. This improves recall on conversational questions.
-
-### 3. Answer Grounding Check
-
-After generation, citation markers like `[1]`, `[3]` are parsed and validated against the number of context documents. Hallucinated citations surface as warnings in the UI.
-
-### 4. RAGAS Evaluation
-
-```bash
-python eval/eval_pipeline.py --pdf attention.pdf --output eval/results/latest_eval.json
-```
-
-| Metric | Description |
-|---|---|
-| **Faithfulness** | Is the answer fully supported by the context? |
-| **Answer Relevancy** | Does the answer address the question? |
-| **Context Precision** | How much of the retrieved context is relevant? |
-| **Context Recall** | Does context cover the ground-truth answer? |
+### 4. Citation Grounding Validation
+Every generated answer is parsed for citation indicators (e.g. `[1]`, `[2]`). An automated post-processing step validates that each citation correctly maps back to a retrieved source document. Hallucinated citations trigger visual warnings in the UI to protect user trust.
 
 ---
 
-## Setup
+## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Python ≥ 3.11
-- [Google AI Studio API key](https://aistudio.google.com/) (free tier: 60 RPM)
-- [Pinecone account](https://www.pinecone.io/) (free tier: 1M vector ops/month)
+- **Python >= 3.11**
+- **Google Gemini API Key** (Get one from [Google AI Studio](https://aistudio.google.com/))
+- **Pinecone Cloud Account** (Create a free serverless index on [Pinecone Console](https://app.pinecone.io/))
 
-### Step 1 — Create Pinecone Index
-In [Pinecone Console](https://app.pinecone.io):
-- **Name**: `mini-rag`
-- **Dimension**: `3072`
-- **Metric**: `cosine`
-- **Cloud**: AWS us-east-1 (free tier)
+### Step 1 — Create your Pinecone Index
+In your Pinecone console, create an index with the following specifications:
+- **Name:** `mini-rag` (or custom name configured in `.env`)
+- **Dimension:** `3072` (corresponds to `gemini-embedding-001`)
+- **Metric:** `cosine`
+- **Cloud/Region:** AWS `us-east-1` (available on the free tier)
 
-### Step 2 — Install
+### Step 2 — Clone & Install Dependencies
+Clone the repository and install the package. We recommend using a virtual environment.
 
 ```bash
+# Clone
 git clone https://github.com/sakshinaithani2005/miniRAG.git
 cd miniRAG
 
-python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
+# Virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Core app
-pip install -e .
-
-# Optional: RAGAS evaluation
-pip install -e ".[eval]"
-
-# Optional: web search fallback
-pip install -e ".[web]"
-
-# Development (tests, linting)
-pip install -e ".[dev]"
+# Install the package with ALL optional modules (eval, web search, docx, and dev tools)
+pip install -e ".[all]"
 ```
 
-### Step 3 — Configure
+### Step 3 — Environment Configuration
+Copy the template `.env` file and add your credentials:
 
 ```bash
 cp .env.example .env
-# Fill in:
-# GOOGLE_API_KEY=...
-# PINECONE_API_KEY=...
-# PINECONE_INDEX_NAME=mini-rag
 ```
 
-### Step 4 — Run
+Open `.env` and configure:
+```env
+GOOGLE_API_KEY=your_gemini_api_key_here
+PINECONE_API_KEY=your_pinecone_api_key_here
+PINECONE_INDEX_NAME=mini-rag
+```
+
+---
+
+## 💻 Running the Application
+
+### 1. Interactive Streamlit Web App
+Launch the Streamlit web dashboard to upload PDFs/text files, manage indexes, choose retrieval strategies (dense, hybrid, or MMR), and query your data.
 
 ```bash
-# Streamlit UI
 streamlit run app.py
+```
+*The web UI features a customized dark theme with glassmorphism cards and live-streaming answers with detailed stage-by-stage latency breakdowns.*
 
-# CLI
-python -m minirag.cli --query "What is attention?" --doc attention.pdf
+### 2. Command Line Interface (CLI)
+Query the RAG pipeline directly from your terminal:
 
-# With a specific retrieval strategy
-python -m minirag.cli -q "Explain BERT" --doc paper.pdf --strategy hybrid
+```bash
+# Index a PDF and query it immediately
+python -m minirag.cli --query "What are attention mechanisms?" --doc attention.pdf
 
-# Evaluation
-python eval/eval_pipeline.py --pdf attention.pdf
+# Query with hybrid strategy
+python -m minirag.cli --query "What is BERT?" --doc attention.pdf --strategy hybrid
 ```
 
-### Docker
+### 3. Running with Docker
+Run the application in a sandboxed container:
 
 ```bash
 docker compose up --build
-# App available at http://localhost:8501
 ```
+*Access the Streamlit application at `http://localhost:8501`*
 
 ---
 
-## Configuration
+## 📊 RAGAS Evaluation Pipeline
 
-All settings live in `src/minirag/config.py` (pydantic-settings) and can be overridden via environment variables:
-
-| Env Var | Default | Description |
-|---|---|---|
-| `GOOGLE_API_KEY` | — | Google AI Studio API key |
-| `PINECONE_API_KEY` | — | Pinecone API key |
-| `PINECONE_INDEX_NAME` | `mini-rag` | Index name |
-| `RETRIEVAL_STRATEGY` | `hybrid` | `dense` / `hybrid` / `mmr` |
-| `RETRIEVAL_TOP_K` | `10` | Candidates from vector DB |
-| `RERANK_TOP_N` | `5` | After FlashRank reranking |
-| `CHUNK_SIZE` | `1000` | Characters per chunk |
-| `CHUNK_OVERLAP` | `200` | Overlap between chunks |
-| `ENABLE_QUERY_REWRITING` | `true` | HyDE-lite query rewriting |
-| `ENABLE_WEB_FALLBACK` | `false` | DuckDuckGo fallback |
-| `ENABLE_LANGSMITH_TRACING` | `false` | LangSmith trace export |
-| `LLM_TEMPERATURE` | `0.3` | Generation temperature |
-
----
-
-## Development
+Evaluate the quality of your RAG pipeline objectively across standardized metrics:
 
 ```bash
-# Run tests
-pytest tests/ -v --cov=src/minirag
+# Run evaluation over the sample Q&A dataset (pre-bundled)
+python eval/eval_pipeline.py
 
-# Lint
-ruff check src/ tests/
-
-# Type check
-mypy src/minirag/ --ignore-missing-imports
-
-# Install pre-commit hooks (runs ruff + mypy on every commit)
-pre-commit install
+# Evaluate a specific retrieval strategy against a target PDF
+python eval/eval_pipeline.py --pdf attention.pdf --strategy hybrid --output eval/results/run_stats.json
 ```
+
+### Metrics Evaluated
+
+1. **Faithfulness:** Verifies if the generated answer is strictly grounded in the retrieved context (detects hallucinations).
+2. **Answer Relevancy:** Measures whether the generated response directly answers the user's question.
+3. **Context Precision:** Computes the signal-to-noise ratio of the retrieved chunks.
+4. **Context Recall:** Validates whether the retriever fetched all the information required to generate the ground-truth answer.
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 miniRAG/
-├── src/minirag/              # Core package
-│   ├── config.py             # pydantic-settings, RetrievalStrategy enum
-│   ├── embeddings.py         # Gemini embedding singleton
-│   ├── llm.py                # Gemini generation singleton
-│   ├── document_processor.py # Load → chunk → hash → metadata
-│   ├── vectorstore.py        # Pinecone + per-namespace management
-│   ├── hybrid_retriever.py   # BM25 + dense + RRF fusion
-│   ├── retriever.py          # Strategy factory (dense/hybrid/mmr)
-│   ├── rag_chain.py          # LCEL chain + query rewriting + citations
-│   ├── web_search.py         # DuckDuckGo fallback
-│   ├── observability.py      # structlog + QueryTracer
-│   └── cli.py                # CLI interface
+├── src/minirag/              # Core python package
+│   ├── __init__.py           # Package initializer
+│   ├── config.py             # App configurations (pydantic-settings) & validation
+│   ├── document_processor.py # Load, clean, chunk, and hash source files (PDFs/txt)
+│   ├── embeddings.py         # Lazy initialization of Gemini embedding models
+│   ├── llm.py                # Lazy initialization of ChatGoogleGenerativeAI
+│   ├── vectorstore.py        # Pinecone database client and namespace actions
+│   ├── hybrid_retriever.py   # Lexical BM25 and dense embeddings rank fusion
+│   ├── retriever.py          # Strategy Factory (Dense, Hybrid, MMR)
+│   ├── rag_chain.py          # LCEL RAG chain, HyDE rewriting, & citation logic
+│   ├── web_search.py         # DuckDuckGo fallback query execution
+│   ├── observability.py      # structlog setup & latency-tracking metrics
+│   └── cli.py                # Command Line Interface execution entry
 │
-├── tests/                    # pytest unit tests (≥70% coverage)
+├── tests/                    # 100% passing test suite (Pytest)
+│   ├── conftest.py           # Testing configurations and mock environments
+│   ├── test_config.py        # Settings validation tests
 │   ├── test_document_processor.py
-│   ├── test_rag_chain.py
 │   ├── test_hybrid_retriever.py
-│   ├── test_config.py
+│   ├── test_rag_chain.py
 │   └── test_web_search.py
 │
-├── eval/                     # RAGAS evaluation pipeline
-│   ├── eval_pipeline.py      # Metrics: Faithfulness, Relevancy, Precision, Recall
+├── eval/                     # Performance Evaluation Module
+│   ├── eval_pipeline.py      # RAGAS metrics evaluator
 │   └── dataset/
-│       └── sample_qa.json    # Bundled Q/A pairs (Attention Is All You Need)
+│       └── sample_qa.json    # Standard Q&A dataset for benchmark evaluation
 │
-├── app.py                    # Streamlit UI (chat, streaming, latency breakdown)
-├── pyproject.toml            # Project metadata + tool configs
-├── Dockerfile                # Production Docker image
-├── docker-compose.yml        # Compose for local deployment
-├── .pre-commit-config.yaml   # ruff + mypy pre-commit hooks
-└── .github/workflows/ci.yml  # CI: lint → typecheck → test
+├── app.py                    # Streamlit Web UI (dark glassmorphism dashboard)
+├── pyproject.toml            # Package configuration and dependencies definitions
+├── Dockerfile                # Docker setup
+├── docker-compose.yml        # Multi-container local deployment
+├── .pre-commit-config.yaml   # Ruff (linter) & Mypy (typecheck) pre-commit hooks
+└── .github/workflows/ci.yml  # Automated GitHub Actions workflow
 ```
 
 ---
 
-## Design Decisions
+## 🧪 Testing & Linting
 
-| Choice | Rationale |
-|---|---|
-| **Hybrid BM25 + dense** | Closes vocab gap; dense alone misses exact keyword matches |
-| **RRF over learned fusion** | Parameter-free, robust, no training data needed |
-| **FlashRank reranker** | Zero cost, ~5ms CPU cross-encoder; no extra API key |
-| **Pinecone namespaces** | Isolates docs; enables multi-doc querying without index pollution |
-| **pydantic-settings Config** | Single source of truth; env-var overrides; validated at startup |
-| **HyDE-lite rewriting** | Improves recall for vague conversational queries |
-| **structlog JSON** | Machine-parseable logs; query-level latency breakdown |
-| **RAGAS eval** | Quantifiable retrieval quality — not just vibes |
+Verify your local changes and ensure code quality standards:
+
+```bash
+# Run all tests with coverage reporting
+pytest tests/ -v --cov=src/minirag
+
+# Run Ruff for style checking and auto-formatting
+ruff check src/ tests/
+
+# Verify type safety
+mypy src/minirag/ --ignore-missing-imports
+```
 
 ---
 
-## Cost & Performance
+## ⚙️ Configuration Properties
 
-| Component | Cost | Latency |
+The following environment variables can be declared in your `.env` file to customize the RAG behavior:
+
+| Environment Variable | Default | Description |
 |---|---|---|
-| Gemini Embeddings (`gemini-embedding-001`) | Free tier: 1500 req/day | ~200ms |
-| Gemini Generation (`gemini-2.5-flash`) | ~$0.075/1M tokens in | ~0.5–2s |
-| Pinecone Serverless | Free tier: 1M vector ops/month | ~50ms |
-| BM25 Reranking | $0 (local CPU) | <1ms |
-| FlashRank Reranking | $0 (local CPU) | ~5ms |
-
-**Typical end-to-end query cost**: ~$0.0001–0.0005
+| `GOOGLE_API_KEY` | — | Your Gemini API Key from Google AI Studio. |
+| `PINECONE_API_KEY` | — | Your Pinecone database API Key. |
+| `PINECONE_INDEX_NAME` | `mini-rag` | The Pinecone index name. |
+| `RETRIEVAL_STRATEGY` | `hybrid` | Default retrieval strategy (`dense`, `hybrid`, `mmr`). |
+| `RETRIEVAL_TOP_K` | `10` | The number of initial candidate chunks retrieved from Pinecone/BM25. |
+| `RERANK_TOP_N` | `5` | The number of chunks returned to the generator after Cross-Encoder reranking. |
+| `CHUNK_SIZE` | `1000` | Target characters per chunk during text splitting. |
+| `CHUNK_OVERLAP` | `200` | Overlap character length between chunks. |
+| `ENABLE_QUERY_REWRITING` | `true` | Enable/Disable HyDE-lite query rewriting. |
+| `ENABLE_WEB_FALLBACK` | `false` | Enable/Disable DuckDuckGo web search fallback. |
+| `WEB_FALLBACK_THRESHOLD` | `0.3` | Confidence score below which web fallback search is triggered. |
+| `ENABLE_LANGSMITH_TRACING`| `false` | Enable/Disable LangSmith tracing. |
+| `LLM_TEMPERATURE` | `0.3` | The temperature parameter for LLM response generation. |
 
 ---
 
-## License
+## ⚖️ License
 
-MIT © miniRAG contributors
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
