@@ -23,13 +23,19 @@ from vectorstore import (
 
 def test_initialize_vectorstore_without_api_key():
     with patch("config.Config.get_pinecone_api_key", return_value=""):
-        with pytest.raises(ValueError, match="PINECONE_API_KEY is not set"):
+        with pytest.raises(
+            ValueError, match="PINECONE_API_KEY is not set"
+        ):
             initialize_vectorstore()
 
 
 def test_initialize_vectorstore_index_not_found():
-    with patch("config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"):
-        with patch("config.Config.get_pinecone_index_name", return_value="my-index"):
+    with patch(
+        "config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"
+    ):
+        with patch(
+            "config.Config.get_pinecone_index_name", return_value="my-index"
+        ):
             with patch("vectorstore.Pinecone") as mock_pinecone:
                 # Mock pc.list_indexes().indexes returning non-matching index
                 mock_pc = MagicMock()
@@ -45,8 +51,12 @@ def test_initialize_vectorstore_index_not_found():
 
 
 def test_initialize_vectorstore_success():
-    with patch("config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"):
-        with patch("config.Config.get_pinecone_index_name", return_value="my-index"):
+    with patch(
+        "config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"
+    ):
+        with patch(
+            "config.Config.get_pinecone_index_name", return_value="my-index"
+        ):
             with patch("vectorstore.Pinecone") as mock_pinecone:
                 mock_pc = MagicMock()
                 mock_idx = MagicMock()
@@ -56,7 +66,9 @@ def test_initialize_vectorstore_success():
 
                 with patch("embeddings.get_embeddings") as mock_get_embed:
                     mock_get_embed.return_value = MagicMock()
-                    with patch("vectorstore.PineconeVectorStore") as mock_vs_cls:
+                    with patch(
+                        "vectorstore.PineconeVectorStore"
+                    ) as mock_vs_cls:
                         initialize_vectorstore()
                         mock_vs_cls.assert_called_once_with(
                             index_name="my-index",
@@ -79,8 +91,12 @@ def test_add_documents_to_vectorstore_success():
     docs = [Document(page_content=f"chunk {i}") for i in range(150)]
     mock_vs = MagicMock()
 
-    with patch("config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"):
-        with patch("config.Config.get_pinecone_index_name", return_value="my-index"):
+    with patch(
+        "config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"
+    ):
+        with patch(
+            "config.Config.get_pinecone_index_name", return_value="my-index"
+        ):
             with patch("vectorstore.Pinecone") as mock_pinecone:
                 mock_pc = MagicMock()
                 mock_index = MagicMock()
@@ -91,7 +107,9 @@ def test_add_documents_to_vectorstore_success():
 
                 # Verified delete namespaces called
                 mock_pc.Index.assert_called_once_with("my-index")
-                mock_index.delete.assert_called_once_with(delete_all=True, namespace="")
+                mock_index.delete.assert_called_once_with(
+                    delete_all=True, namespace=""
+                )
 
                 # Verified add_documents called in batches of 100
                 assert mock_vs.add_documents.call_count == 2
@@ -99,8 +117,12 @@ def test_add_documents_to_vectorstore_success():
 
 
 def test_clear_vectorstore():
-    with patch("config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"):
-        with patch("config.Config.get_pinecone_index_name", return_value="my-index"):
+    with patch(
+        "config.Config.get_pinecone_api_key", return_value="fake-pinecone-key"
+    ):
+        with patch(
+            "config.Config.get_pinecone_index_name", return_value="my-index"
+        ):
             with patch("vectorstore.Pinecone") as mock_pinecone:
                 mock_pc = MagicMock()
                 mock_index = MagicMock()
@@ -110,4 +132,6 @@ def test_clear_vectorstore():
                 clear_vectorstore(MagicMock())
 
                 mock_pc.Index.assert_called_once_with("my-index")
-                mock_index.delete.assert_called_once_with(delete_all=True, namespace="")
+                mock_index.delete.assert_called_once_with(
+                    delete_all=True, namespace=""
+                )

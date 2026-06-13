@@ -68,7 +68,9 @@ def test_create_retriever_dense_with_reranker():
     mock_reranker = MagicMock()
 
     with patch("retriever.get_reranker", return_value=mock_reranker):
-        with patch("langchain_classic.retrievers.ContextualCompressionRetriever") as mock_ccr:
+        with patch(
+            "langchain_classic.retrievers.ContextualCompressionRetriever"
+        ) as mock_ccr:
             create_retriever(mock_vs, strategy=RetrievalStrategy.DENSE)
             mock_ccr.assert_called_once()
 
@@ -77,7 +79,9 @@ def test_create_retriever_hybrid_no_corpus_fallback():
     mock_vs = MagicMock()
     with patch("retriever.get_reranker", return_value=None):
         # Hybrid strategy with empty corpus should fallback to DENSE
-        create_retriever(mock_vs, corpus=None, strategy=RetrievalStrategy.HYBRID)
+        create_retriever(
+            mock_vs, corpus=None, strategy=RetrievalStrategy.HYBRID
+        )
         mock_vs.as_retriever.assert_called_once_with(search_kwargs={"k": 10})
 
 
