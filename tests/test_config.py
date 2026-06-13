@@ -42,13 +42,12 @@ def test_config_get_pinecone_index_name_default():
 
 def test_config_validate_false_without_keys():
     from config import Config
+    from unittest.mock import patch as mk_patch
 
-    # Clear both keys
-    with patch.dict(os.environ, {}, clear=True):
-        # Reset the cached settings so it reads fresh env
-        Config._s = None
+    # Patch the classmethod helpers to return empty strings
+    with mk_patch.object(Config, "get_google_api_key", return_value=""), \
+         mk_patch.object(Config, "get_pinecone_api_key", return_value=""):
         result = Config.validate()
-    Config._s = None  # cleanup
     assert result is False
 
 

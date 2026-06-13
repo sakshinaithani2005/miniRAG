@@ -1,38 +1,30 @@
 """
-LLM module for Mini RAG app.
-Handles Google Gemini LLM initialization.
+LLM module for miniRAG.
+Handles Google Gemini LLM initialisation.
 """
 
+from __future__ import annotations
+
 from langchain_google_genai import ChatGoogleGenerativeAI
+
 from config import Config
-
-
-def initialize_llm() -> ChatGoogleGenerativeAI:
-    """
-    Initialize Google Gemini LLM.
-    
-    Returns:
-        ChatGoogleGenerativeAI instance
-    """
-    return ChatGoogleGenerativeAI(
-        model=Config.LLM_MODEL,
-        temperature=Config.LLM_TEMPERATURE,
-        google_api_key=Config.get_google_api_key()
-    )
-
-
-# Singleton instance
-_llm_instance = None
 
 
 def get_llm() -> ChatGoogleGenerativeAI:
     """
-    Get or create LLM instance (singleton pattern).
-    
-    Returns:
-        ChatGoogleGenerativeAI instance
+    Create a fresh ChatGoogleGenerativeAI instance.
+
+    Called lazily after env vars are propagated so the API key is always
+    current.  Streamlit caches the result via @st.cache_resource.
     """
-    global _llm_instance
-    if _llm_instance is None:
-        _llm_instance = initialize_llm()
-    return _llm_instance
+    api_key = Config.get_google_api_key()
+    if not api_key:
+        raise ValueError(
+            "GOOGLE_API_KEY is not set. "
+            "Add it to your .env file or Streamlit Secrets."
+        )
+    return ChatGoogleGenerativeAI(
+        model=Config.LLM_MODEL,
+        temperature=Config.LLM_TEMPERATURE,
+        google_api_key=api_key,
+    )

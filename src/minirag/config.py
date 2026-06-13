@@ -159,10 +159,7 @@ class Config:
 
     @classmethod
     def validate(cls) -> bool:
-        try:
-            s = cls._settings()
-            return bool(s.google_api_key and s.pinecone_api_key and s.pinecone_index_name)
-        except Exception as exc:
-            print(f"⚠️  Config validation failed: {exc}")
-            # Fall back to env var check
-            return bool(os.getenv("GOOGLE_API_KEY") and os.getenv("PINECONE_API_KEY"))
+        """Return True if all required API keys are present."""
+        google_key = cls.get_google_api_key()
+        pinecone_key = cls.get_pinecone_api_key()
+        return bool(google_key and pinecone_key)

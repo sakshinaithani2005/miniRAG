@@ -85,9 +85,17 @@ def reciprocal_rank_fusion(
 
 
 def _doc_key(doc: Document) -> str:
-    """Stable string key for a Document (chunk_id preferred, else hash of content)."""
-    if "chunk_id" in doc.metadata:
-        return str(doc.metadata["chunk_id"])
+    """Stable string key for a Document used for RRF deduplication.
+
+    Uses ``file_hash + chunk_id`` composite so chunks from different documents
+    that share the same sequential ``chunk_id`` are NOT collapsed together.
+    Falls back to a hash of the first 200 characters of content.
+    """
+    file_hash = doc.metadata.get("file_hash", "")
+    chunk_id = doc.metadata.get("chunk_id")
+    if chunk_id is not None:
+        return f"{file_hash}:{chunk_id}"
+    # Fallback: hash of content prefix (stable, collision-resistant)
     return str(hash(doc.page_content[:200]))
 
 

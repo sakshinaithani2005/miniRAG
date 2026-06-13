@@ -134,8 +134,8 @@ def chunk_documents(
         List of chunked ``Document`` objects.
     """
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size or Config.CHUNK_SIZE,
-        chunk_overlap=chunk_overlap or Config.CHUNK_OVERLAP,
+        chunk_size=Config.CHUNK_SIZE if chunk_size is None else chunk_size,
+        chunk_overlap=Config.CHUNK_OVERLAP if chunk_overlap is None else chunk_overlap,
         separators=Config.CHUNK_SEPARATORS,
     )
     return splitter.split_documents(documents)

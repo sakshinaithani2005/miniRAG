@@ -70,19 +70,21 @@ def should_fallback(retrieved_docs: List[Document], threshold: float = 0.30) -> 
     if len(retrieved_docs) < 2:
         return True
 
-    scores = [
-        doc.metadata.get("relevance_score") or doc.metadata.get("score")
-        for doc in retrieved_docs
-        if doc.metadata.get("relevance_score") is not None
-        or doc.metadata.get("score") is not None
-    ]
+    # Collect whichever score metadata key is present per document
+    scores = []
+    for doc in retrieved_docs:
+        score = doc.metadata.get("relevance_score")
+        if score is None:
+            score = doc.metadata.get("score")
+        if score is not None:
+            scores.append(float(score))
 
     if scores:
         avg_score = sum(scores) / len(scores)
         return avg_score < threshold
 
     # No score metadata — only trigger if very few docs returned
-    return len(retrieved_docs) == 0
+    return len(retrieved_docs) < 2
 
 
 def augment_with_web(

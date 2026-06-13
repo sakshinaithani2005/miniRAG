@@ -213,23 +213,29 @@ def query_rag(
 
 def stream_rag(
     chain,
-    retriever,
+    retrieved_docs: List[Document],
     question: str,
-    *,
-    enable_rewrite: bool = True,
-    llm=None,
-) -> Tuple[Generator, List[Document]]:
+) -> Generator:
     """
-    Execute a RAG query with streaming token output.
+    Stream token output for a RAG answer given pre-fetched context docs.
+
+    Retrieval must be done BEFORE calling this function.  Separating
+    retrieval from generation allows accurate per-stage latency measurement
+    and avoids double-retrieval.
+
+    Args:
+        chain:          LCEL generation chain (prompt | llm | StrOutputParser).
+        retrieved_docs: Already-retrieved context documents.
+        question:       The original user question.
 
     Returns:
-        Tuple of (token_generator, retrieved_docs).
-        Consume the generator in ``st.write_stream()`` or similar.
+        Token generator — consume with ``st.write_stream()`` or iteration.
     """
-    retrieval_query = question
-    if enable_rewrite and llm is not None:
-        retrieval_query = rewrite_query(question, llm)
+    context_str = format_docs(retrieved_docs)
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
 
-    retrieved_docs: List[Document] = retriever.invoke(retrieval_query)
-    token_stream = chain.stream(question)
-    return token_stream, retrieved_docs
+    prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
+    # Build a simple chain that does NOT include retrieval
+    gen_chain = prompt | chain.steps[-2] | StrOutputParser()  # llm step
+    return gen_chain.stream({"context": context_str, "question": question})

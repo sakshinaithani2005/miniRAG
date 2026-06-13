@@ -1,121 +1,133 @@
 """
-Vector store module for Mini RAG app.
-Handles Pinecone vector store initialization and operations.
+Vector store module for miniRAG.
+Handles Pinecone vector store initialization and document operations.
 """
 
+from __future__ import annotations
+
+import os
+import time
+from typing import List, Optional
+
+from langchain_core.documents import Document
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
-from langchain_core.documents import Document
-from embeddings import get_embeddings
-from config import Config
-from typing import List
-import os
 
+from config import Config
+
+
+# ---------------------------------------------------------------------------
+# Initialisation
+# ---------------------------------------------------------------------------
 
 def initialize_vectorstore() -> PineconeVectorStore:
     """
-    Initialize Pinecone vector store.
-    
-    Returns:
-        PineconeVectorStore instance
+    Initialise a PineconeVectorStore against the configured index.
+
+    Embeddings are resolved lazily here (after env vars are set) to avoid
+    the module-import-before-env-var ordering bug.
     """
-    try:
-        # Initialize Pinecone client
-        pc = Pinecone(api_key=Config.get_pinecone_api_key())
-        index_name = Config.get_pinecone_index_name()
-        
-        # Verify index exists by listing available indexes
-        indexes = pc.list_indexes()
-        index_names = [idx.name for idx in indexes.indexes]
-        
-        if index_name not in index_names:
-            raise ValueError(
-                f"❌ Pinecone index '{index_name}' not found.\n"
-                f"Available indexes: {index_names if index_names else 'None'}\n"
-                f"Create an index at: https://app.pinecone.io"
-            )
-        
-        # Create vectorstore - uses default namespace if not specified
-        vectorstore = PineconeVectorStore(
-            index_name=index_name,
-            embedding=get_embeddings(),
-            namespace=""  # Use default namespace (empty string)
-        )
-        
-        return vectorstore
-        
-    except Exception as e:
-        raise ConnectionError(
-            f"❌ Failed to initialize Pinecone: {str(e)}\n\n"
-            f"Make sure:\n"
-            f"1. PINECONE_API_KEY is correct\n"
-            f"2. PINECONE_INDEX_NAME exists in Pinecone console\n"
-            f"3. Your Pinecone account is active"
+    from embeddings import get_embeddings  # lazy — env vars already set by app.py
+
+    pinecone_api_key = Config.get_pinecone_api_key()
+    index_name = Config.get_pinecone_index_name() or "mini-rag"
+
+    if not pinecone_api_key:
+        raise ValueError(
+            "PINECONE_API_KEY is not set. "
+            "Add it to your .env file or Streamlit Secrets."
         )
 
+    pc = Pinecone(api_key=pinecone_api_key)
+    indexes = pc.list_indexes()
+    index_names = [idx.name for idx in indexes.indexes]
 
-# Singleton instance
-_vectorstore_instance = None
+    if index_name not in index_names:
+        raise ValueError(
+            f"Pinecone index '{index_name}' not found.\n"
+            f"Available indexes: {index_names or 'None'}\n"
+            "Create one at https://app.pinecone.io (dimension=3072, metric=cosine)"
+        )
+
+    return PineconeVectorStore(
+        index_name=index_name,
+        embedding=get_embeddings(),
+        namespace="",  # default namespace
+    )
 
 
 def get_vectorstore() -> PineconeVectorStore:
-    """
-    Get or create vectorstore instance (singleton pattern).
-    
-    Returns:
-        PineconeVectorStore instance
-    """
-    global _vectorstore_instance
-    if _vectorstore_instance is None:
-        _vectorstore_instance = initialize_vectorstore()
-    return _vectorstore_instance
+    """Create and return a fresh PineconeVectorStore (no module-level singleton)."""
+    return initialize_vectorstore()
 
+
+# ---------------------------------------------------------------------------
+# Document ingestion
+# ---------------------------------------------------------------------------
 
 def add_documents_to_vectorstore(
     documents: List[Document],
-    vectorstore: PineconeVectorStore = None
+    vectorstore: Optional[PineconeVectorStore] = None,
 ) -> int:
     """
-    Add documents to vector store with metadata for citations.
-    
+    Upload chunked documents to Pinecone.
+
+    Clears the default namespace before uploading so each indexing run
+    starts fresh. Documents must already have ``chunk_id`` and
+    ``source_snippet`` in their metadata (set by ``process_documents``).
+
     Args:
-        documents: List of Document objects to add
-        vectorstore: PineconeVectorStore instance (uses singleton if None)
-    
+        documents:   Chunked Documents from ``process_documents()``.
+        vectorstore: An existing PineconeVectorStore.  A new one is created
+                     if not supplied.
+
     Returns:
-        Number of documents added
+        Number of documents actually added.
     """
+    if not documents:
+        return 0
+
     if vectorstore is None:
         vectorstore = get_vectorstore()
-    
-    # Add metadata for citation
-    for i, doc in enumerate(documents):
-        doc.metadata.update({
-            "chunk_id": i + 1,
-            "source_snippet": doc.page_content[:Config.SNIPPET_LENGTH] + "..."
-        })
-    
+
+    # ── Clear previous documents from default namespace ───────────────────────
+    # We use the low-level Pinecone client to delete by namespace because
+    # PineconeVectorStore.delete(delete_all=True) doesn't always respect the
+    # namespace parameter correctly across versions.
     try:
-        # Try to clear previous documents (may fail if namespace is empty)
-        vectorstore.delete(delete_all=True)
-    except Exception as e:
-        # If delete fails, it might be the first time - that's okay
-        print(f"Note: Could not clear previous docs (likely first time): {str(e)}")
-    
-    # Add new documents
-    vectorstore.add_documents(documents)
-    
-    return len(documents)
+        pinecone_api_key = Config.get_pinecone_api_key()
+        index_name = Config.get_pinecone_index_name() or "mini-rag"
+        pc = Pinecone(api_key=pinecone_api_key)
+        index = pc.Index(index_name)
+        index.delete(delete_all=True, namespace="")
+        # Brief pause so Pinecone propagates the delete before new upserts
+        time.sleep(0.5)
+    except Exception as exc:
+        # 404 "Namespace not found" is expected on first run — safe to ignore
+        print(f"Note: Could not clear previous docs (likely first run): {exc}")
+
+    # ── Upload in batches of 100 to avoid request-size limits ─────────────────
+    BATCH = 100
+    added = 0
+    for i in range(0, len(documents), BATCH):
+        batch = documents[i : i + BATCH]
+        vectorstore.add_documents(batch)
+        added += len(batch)
+
+    return added
 
 
-def clear_vectorstore(vectorstore: PineconeVectorStore = None) -> None:
-    """
-    Clear all documents from vector store.
-    
-    Args:
-        vectorstore: PineconeVectorStore instance (uses singleton if None)
-    """
-    if vectorstore is None:
-        vectorstore = get_vectorstore()
-    
-    vectorstore.delete(delete_all=True)
+# ---------------------------------------------------------------------------
+# Utility
+# ---------------------------------------------------------------------------
+
+def clear_vectorstore(vectorstore: Optional[PineconeVectorStore] = None) -> None:
+    """Delete all vectors from the default namespace."""
+    try:
+        pinecone_api_key = Config.get_pinecone_api_key()
+        index_name = Config.get_pinecone_index_name() or "mini-rag"
+        pc = Pinecone(api_key=pinecone_api_key)
+        index = pc.Index(index_name)
+        index.delete(delete_all=True, namespace="")
+    except Exception as exc:
+        print(f"⚠️  clear_vectorstore failed: {exc}")
