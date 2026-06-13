@@ -1,81 +1,175 @@
 """
-Retriever module for Mini RAG app.
-Handles retrieval and reranking logic.
+Retriever module for miniRAG.
+
+Supports three retrieval strategies (controlled by Config / Settings):
+  - DENSE   : Pinecone cosine similarity + FlashRank reranking (original)
+  - HYBRID  : Dense + BM25 via Reciprocal Rank Fusion + FlashRank reranking
+  - MMR     : Maximal Marginal Relevance for diversity-aware retrieval
+
+The active strategy is selected by the ``strategy`` argument to
+``create_retriever()``; it defaults to ``RetrievalStrategy.HYBRID``.
 """
 
+from __future__ import annotations
+
+from typing import List, Optional
+
 from langchain_community.document_compressors.flashrank_rerank import FlashrankRerank
-from langchain_classic.retrievers import ContextualCompressionRetriever
+from langchain_core.documents import Document
 from langchain_pinecone import PineconeVectorStore
-from config import Config
+
+from config import Config, RetrievalStrategy
+from hybrid_retriever import BM25Index, HybridRetriever
 
 
-def initialize_reranker() -> FlashrankRerank:
+# ---------------------------------------------------------------------------
+# Reranker singleton
+# ---------------------------------------------------------------------------
+
+_reranker_instance: Optional[FlashrankRerank] = None
+
+
+def get_reranker() -> Optional[FlashrankRerank]:
     """
-    Initialize FlashRank reranker.
-    
-    Returns:
-        FlashrankRerank instance
-    """
-    try:
-        reranker = FlashrankRerank(top_n=Config.RERANK_TOP_N)
-        # Rebuild pydantic model to ensure full definition (Pydantic v2 compatibility)
-        if hasattr(reranker, 'model_rebuild'):
-            reranker.model_rebuild()
-        return reranker
-    except Exception as e:
-        # If FlashrankRerank fails, create a simple wrapper that just returns top k docs
-        print(f"⚠️  FlashrankRerank initialization warning: {str(e)}")
-        print("   Using basic retrieval without reranking")
-        return None
+    Return a cached FlashrankRerank instance.
 
-
-# Singleton instance
-_reranker_instance = None
-
-
-def get_reranker() -> FlashrankRerank:
-    """
-    Get or create reranker instance (singleton pattern).
-    
-    Returns:
-        FlashrankRerank instance (or None if initialization failed)
+    Returns ``None`` if FlashRank fails to initialise; callers fall back
+    to unranked results gracefully.
     """
     global _reranker_instance
     if _reranker_instance is None:
-        _reranker_instance = initialize_reranker()
+        _reranker_instance = _init_reranker()
     return _reranker_instance
 
 
-def create_retriever(vectorstore: PineconeVectorStore) -> ContextualCompressionRetriever:
-    """
-    Create a compression retriever with FlashRank reranking.
-    
-    Args:
-        vectorstore: PineconeVectorStore instance
-    
-    Returns:
-        ContextualCompressionRetriever instance
-    """
-    # Base retriever from vectorstore
-    base_retriever = vectorstore.as_retriever(
-        search_kwargs={"k": Config.RETRIEVAL_TOP_K}
-    )
-    
-    # Try to use compression retriever with FlashRank
+def _init_reranker() -> Optional[FlashrankRerank]:
+    try:
+        reranker = FlashrankRerank(top_n=Config.RERANK_TOP_N)
+        if hasattr(reranker, "model_rebuild"):
+            reranker.model_rebuild()
+        return reranker
+    except Exception as exc:
+        print(f"⚠️  FlashrankRerank init warning: {exc} — falling back to unranked retrieval.")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Strategy: DENSE  (Pinecone cosine + FlashRank)
+# ---------------------------------------------------------------------------
+
+def _dense_retriever(vectorstore: PineconeVectorStore, top_k: int):
+    """Standard dense retrieval with optional FlashRank reranking."""
+    base = vectorstore.as_retriever(search_kwargs={"k": top_k})
     reranker = get_reranker()
-    
-    if reranker is not None:
-        # Compression retriever with FlashRank
+    if reranker is None:
+        return base
+    try:
+        from langchain_classic.retrievers import ContextualCompressionRetriever  # noqa
+        return ContextualCompressionRetriever(
+            base_compressor=reranker,
+            base_retriever=base,
+        )
+    except Exception as exc:
+        print(f"⚠️  ContextualCompressionRetriever failed: {exc} — using base retriever.")
+        return base
+
+
+# ---------------------------------------------------------------------------
+# Strategy: MMR
+# ---------------------------------------------------------------------------
+
+def _mmr_retriever(vectorstore: PineconeVectorStore, top_k: int):
+    """MMR retriever — promotes diversity in results."""
+    return vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": top_k, "fetch_k": top_k * 3, "lambda_mult": 0.5},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Strategy: HYBRID  (BM25 + dense + RRF + FlashRank)
+# ---------------------------------------------------------------------------
+
+class _HybridWithRerank:
+    """
+    LangChain-compatible retriever that combines HybridRetriever + FlashRank.
+
+    Exposes ``.invoke(query) -> List[Document]`` so it drops into LCEL chains.
+    """
+
+    def __init__(
+        self,
+        hybrid: HybridRetriever,
+        reranker: Optional[FlashrankRerank],
+        top_n: int,
+    ) -> None:
+        self._hybrid = hybrid
+        self._reranker = reranker
+        self._top_n = top_n
+
+    def invoke(self, query: str) -> List[Document]:
+        docs = self._hybrid.retrieve(query)
+        if self._reranker is None:
+            return docs[: self._top_n]
         try:
-            retriever = ContextualCompressionRetriever(
-                base_compressor=reranker,
-                base_retriever=base_retriever
-            )
-            return retriever
-        except Exception as e:
-            print(f"⚠️  Failed to create compression retriever: {str(e)}")
-            print("   Falling back to basic retriever")
-            return base_retriever
+            compressed = self._reranker.compress_documents(docs, query)
+            return list(compressed)[: self._top_n]
+        except Exception:
+            return docs[: self._top_n]
+
+    # Allow use as the left-hand side of an LCEL `|` pipe
+    def __or__(self, other):
+        from langchain_core.runnables import RunnableLambda
+        return RunnableLambda(self.invoke) | other
+
+
+def _hybrid_retriever(
+    vectorstore: PineconeVectorStore,
+    corpus: List[Document],
+    top_k: int,
+) -> _HybridWithRerank:
+    """Build a hybrid (dense + BM25 + RRF) retriever over the given corpus."""
+    bm25_index = BM25Index(corpus)
+    hybrid = HybridRetriever(vectorstore, bm25_index, top_k=top_k)
+    return _HybridWithRerank(hybrid, get_reranker(), Config.RERANK_TOP_N)
+
+
+# ---------------------------------------------------------------------------
+# Public factory
+# ---------------------------------------------------------------------------
+
+def create_retriever(
+    vectorstore: PineconeVectorStore,
+    corpus: Optional[List[Document]] = None,
+    strategy: Optional[RetrievalStrategy] = None,
+):
+    """
+    Build a retriever according to the chosen retrieval strategy.
+
+    Args:
+        vectorstore: Initialised ``PineconeVectorStore``.
+        corpus:      All indexed chunks — **required** for ``HYBRID`` strategy
+                     (used to build the BM25 index over the same documents).
+                     Pass ``None`` or an empty list to fall back to DENSE.
+        strategy:    Which retrieval strategy to use.  Defaults to
+                     ``RetrievalStrategy.HYBRID`` when corpus is available,
+                     otherwise ``RetrievalStrategy.DENSE``.
+
+    Returns:
+        A retriever with an ``.invoke(query) -> List[Document]`` interface
+        that is compatible with LangChain LCEL chains.
+    """
+    top_k = Config.RETRIEVAL_TOP_K
+    chosen = strategy or RetrievalStrategy.HYBRID
+
+    # Cannot do HYBRID without a corpus — fall back gracefully
+    if chosen == RetrievalStrategy.HYBRID and not corpus:
+        print("⚠️  HYBRID requested but no corpus provided — falling back to DENSE.")
+        chosen = RetrievalStrategy.DENSE
+
+    if chosen == RetrievalStrategy.MMR:
+        return _mmr_retriever(vectorstore, top_k)
+    elif chosen == RetrievalStrategy.HYBRID:
+        return _hybrid_retriever(vectorstore, corpus, top_k)
     else:
-        # If reranker failed, just return base retriever
-        return base_retriever
+        return _dense_retriever(vectorstore, top_k)
