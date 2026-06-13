@@ -1,15 +1,10 @@
-# 🧠 miniRAG
+# miniRAG
 
 > **Production-grade, modular Retrieval-Augmented Generation (RAG) system** built with Gemini, Pinecone Serverless, hybrid search (BM25 + Dense), Reciprocal Rank Fusion (RRF), Cross-Encoder reranking, and automated RAGAS evaluation.
 
-[![CI](https://github.com/sakshinaithani2005/miniRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/sakshinaithani2005/miniRAG/actions)
-[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-
 ---
 
-## 🚀 Overview
+## Overview
 
 **miniRAG** is a highly optimized, modular RAG pipeline engineered for SDE and LLM engineering resumes. It showcases modern best practices in LLM orchestration, vector databases, multi-stage retrieval, observability, and automated evaluation.
 
@@ -31,7 +26,7 @@
 
 ---
 
-## 📐 Pipeline Architecture
+## Pipeline Architecture
 
 ```mermaid
 flowchart TD
@@ -53,7 +48,7 @@ flowchart TD
 
 ---
 
-## 💎 Advanced Features
+## Advanced Features
 
 ### 1. Hybrid Search & RRF Fusion
 To achieve optimal retrieval quality, miniRAG merges **Dense Search** (semantic context) and **Sparse Search** (keyword match). The fusion is managed by Reciprocal Rank Fusion (RRF) with a standard constant ($k=60$):
@@ -73,7 +68,7 @@ Every generated answer is parsed for citation indicators (e.g. `[1]`, `[2]`). An
 
 ---
 
-## 🛠️ Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 - **Python >= 3.11**
@@ -119,7 +114,7 @@ PINECONE_INDEX_NAME=mini-rag
 
 ---
 
-## 💻 Running the Application
+## Running the Application
 
 ### 1. Interactive Streamlit Web App
 Launch the Streamlit web dashboard to upload PDFs/text files, manage indexes, choose retrieval strategies (dense, hybrid, or MMR), and query your data.
@@ -150,7 +145,7 @@ docker compose up --build
 
 ---
 
-## 📊 RAGAS Evaluation Pipeline
+## RAGAS Evaluation Pipeline
 
 Evaluate the quality of your RAG pipeline objectively across standardized metrics:
 
@@ -171,7 +166,7 @@ python eval/eval_pipeline.py --pdf attention.pdf --strategy hybrid --output eval
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 miniRAG/
@@ -212,7 +207,7 @@ miniRAG/
 
 ---
 
-## 🧪 Testing & Linting
+## Testing & Linting
 
 Verify your local changes and ensure code quality standards:
 
@@ -229,7 +224,7 @@ mypy src/minirag/ --ignore-missing-imports
 
 ---
 
-## ⚙️ Configuration Properties
+## Configuration Properties
 
 The following environment variables can be declared in your `.env` file to customize the RAG behavior:
 
@@ -251,6 +246,6 @@ The following environment variables can be declared in your `.env` file to custo
 
 ---
 
-## ⚖️ License
+## License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.

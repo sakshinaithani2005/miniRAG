@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Tests for embeddings module."""
 
 from __future__ import annotations

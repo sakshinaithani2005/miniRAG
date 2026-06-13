@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Tests for llm module."""
 
 from __future__ import annotations
