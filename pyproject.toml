@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "minirag"
@@ -73,7 +73,7 @@ Homepage = "https://github.com/sakshinaithani2005/miniRAG"
 Repository = "https://github.com/sakshinaithani2005/miniRAG"
 Issues = "https://github.com/sakshinaithani2005/miniRAG/issues"
 
-# ── Tool configs ────────────────────────────────────────────────────────────
+# ── Tool configs ──────────────────────────────────────────────────────────[...]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
