@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from langchain_core.documents import Document
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
@@ -86,14 +87,19 @@ def test_create_retriever_hybrid_success():
     with patch("retriever.BM25Index") as mock_bm25:
         with patch("retriever.HybridRetriever") as mock_hybrid:
             with patch("retriever.get_reranker", return_value=None):
-                retriever = create_retriever(mock_vs, corpus=corpus, strategy=RetrievalStrategy.HYBRID)
+                retriever = create_retriever(
+                    mock_vs, corpus=corpus, strategy=RetrievalStrategy.HYBRID
+                )
                 mock_bm25.assert_called_once_with(corpus)
-                mock_hybrid.assert_called_once_with(mock_vs, mock_bm25.return_value, top_k=10)
+                mock_hybrid.assert_called_once_with(
+                    mock_vs, mock_bm25.return_value, top_k=10
+                )
                 assert retriever is not None
 
 
 def test_hybrid_with_rerank_invoke():
     from retriever import _HybridWithRerank
+
     mock_hybrid = MagicMock()
     mock_docs = [Document(page_content="doc 1"), Document(page_content="doc 2")]
     mock_hybrid.retrieve.return_value = mock_docs
@@ -113,6 +119,7 @@ def test_hybrid_with_rerank_invoke():
 
 def test_hybrid_with_rerank_pipe():
     from retriever import _HybridWithRerank
+
     r = _HybridWithRerank(MagicMock(), None, top_n=1)
     pipe = r | MagicMock()
     assert pipe is not None

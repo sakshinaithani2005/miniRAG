@@ -38,7 +38,9 @@ def test_initialize_vectorstore_index_not_found():
                 mock_pc.list_indexes.return_value.indexes = [mock_idx]
                 mock_pinecone.return_value = mock_pc
 
-                with pytest.raises(ValueError, match="Pinecone index 'my-index' not found"):
+                with pytest.raises(
+                    ValueError, match="Pinecone index 'my-index' not found"
+                ):
                     initialize_vectorstore()
 
 

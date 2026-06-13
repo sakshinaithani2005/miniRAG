@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
+from langchain_core.documents import Document
 
 _SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
 if str(_SRC) not in sys.path:
@@ -36,8 +39,12 @@ def test_main_success_no_doc():
                     with patch("llm.get_llm") as mock_get_llm:
                         with patch("rag_chain.create_rag_chain") as mock_create_chain:
                             with patch("rag_chain.query_rag") as mock_query:
-                                from langchain_core.documents import Document
-                                mock_docs = [Document(page_content="some content", metadata={"source": "doc.txt", "chunk_id": 1})]
+                                mock_docs = [
+                                    Document(
+                                        page_content="some content",
+                                        metadata={"source": "doc.txt", "chunk_id": 1},
+                                    )
+                                ]
                                 mock_query.return_value = ("RAG answer", mock_docs, [])
 
                                 res = main()
