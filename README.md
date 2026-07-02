@@ -4,9 +4,9 @@
 
 ---
 
-## Overview
 
-**miniRAG** is a highly optimized, modular RAG pipeline engineered for SDE and LLM engineering resumes. It showcases modern best practices in LLM orchestration, vector databases, multi-stage retrieval, observability, and automated evaluation.
+
+
 
 ### Key Architectural Layers
 
