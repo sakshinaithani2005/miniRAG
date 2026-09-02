@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # ── Feature flags ─────────────────────────────────────────────────────────
     enable_query_rewriting: bool = Field(True)
     enable_web_fallback: bool = Field(False)
+    enable_crag: bool = Field(True, description="Enable Corrective RAG with self-reflection")
+    crag_relevance_threshold: float = Field(0.50, ge=0.0, le=1.0, description="Minimum relevant doc ratio before triggering web search")
+    enable_grounding_critique: bool = Field(True, description="Enable post-generation hallucination and grounding check")
 
     # ── Observability ─────────────────────────────────────────────────────────
     log_level: str = Field("INFO")

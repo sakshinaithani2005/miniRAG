@@ -1,70 +1,71 @@
 # miniRAG
 
-> **Production-grade, modular Retrieval-Augmented Generation (RAG) system** built with Gemini, Pinecone Serverless, hybrid search (BM25 + Dense), Reciprocal Rank Fusion (RRF), Cross-Encoder reranking, and automated RAGAS evaluation.
+> **Production-grade Corrective RAG (CRAG) & Agentic Retrieval System** built with Gemini, Pinecone Serverless, hybrid search (BM25 + Dense), Reciprocal Rank Fusion (RRF), FlashRank Cross-Encoder reranking, LLM document grading, dynamic query reformulation, and automated RAGAS evaluation.
 
 ---
-
-
-
-
 
 ### Key Architectural Layers
 
 | Layer | Technology | Engineering Rationale |
 |---|---|---|
-| **Frontend** | Streamlit | Responsive dark glassmorphic UI showcasing latency breakdowns, grounding checks, and real-time streaming. |
+| **Frontend** | Streamlit | Responsive dark glassmorphic UI showcasing latency breakdowns, CRAG reflection badges, grounding checks, and real-time streaming. |
+| **Corrective RAG (CRAG)** | Custom Agentic Loop | Evaluates chunk relevance (`DocumentGrader`), reformulates queries (`QueryTransformer`), and triggers smart web augmentation. |
 | **Embeddings** | `gemini-embedding-001` (3072-dim) | High-dimension embeddings for capturing subtle semantic contexts. |
 | **Vector Store** | Pinecone Serverless | Low-latency cloud search featuring **strict namespace isolation** to prevent data cross-contamination. |
 | **Sparse Retrieval** | BM25 (`rank-bm25`) | In-memory lexical scoring to guarantee exact matches for key terms (e.g. codes, IDs, proper nouns). |
 | **Rank Fusion** | Reciprocal Rank Fusion (RRF) | Merges sparse and dense candidate lists using parameter-free ranking. Resolves collisions using composite keys (`file_hash` + `chunk_id`). |
 | **Reranking** | FlashRank Cross-Encoder | Local, zero-cost CPU-optimized Cross-Encoder (`ms-marco-MultiBERT-L-12`) that reduces query window sizes from 20 to 5 candidates. |
 | **LLM Generation** | `gemini-2.5-flash` | Ultra-fast generation with support for live streaming and citation markers. |
-| **Query Rewriting** | HyDE-lite (Gemini) | Automatically reframes vague queries into highly descriptive target passages to maximize vector retrieval recall. |
-| **Web Fallback** | DuckDuckGo API | Agentic fallback mechanism that triggers a live web search if retrieval confidence scores fall below a minimum relevance threshold. |
+| **Query Rewriting & Transform** | HyDE-lite & QueryTransformer | Reformulates queries for optimal vector recall and web-search augmentation. |
+| **Grounding Guardrail** | `GroundingChecker` | Self-critique audit calculating faithfulness scores and detecting unsupported claims. |
 | **Evaluation** | RAGAS Framework | Measures system performance across four key axes: Faithfulness, Answer Relevancy, Context Precision, and Context Recall. |
 | **Observability** | `structlog` | Structured JSON logging providing a granular, per-stage latency breakdown. |
 
 ---
 
-## Pipeline Architecture
+## Pipeline Architecture (Corrective RAG)
 
 ```mermaid
 flowchart TD
-    A[User Query] --> B{Query Rewriting\nHyDE-lite}
+    A[User Query] --> B{Query Rewriter / HyDE}
     B --> C[Gemini Embeddings]
-    C --> D[Pinecone\nDense Retrieval k=10]
-    C --> E[BM25\nSparse Retrieval k=10]
-    D --> F[Reciprocal Rank Fusion\nRRF]
+    C --> D[Pinecone Dense Retrieval]
+    C --> E[BM25 Sparse Retrieval]
+    D --> F[Reciprocal Rank Fusion RRF]
     E --> F
-    F --> G[FlashRank Reranker\ntop-5]
-    G --> H{Mean Score < Threshold?}
-    H -- Yes --> I[DuckDuckGo Web Search\nWeb Fallback]
-    H -- No --> J[Format Context\n+ Citations]
-    I --> J
-    J --> K[Gemini-2.5-flash\nGeneration with Streaming]
-    K --> L[Answer + Citation Grounding]
-    L --> M[Structured logs\nLatency Breakdown]
+    F --> G[FlashRank Cross-Encoder top-5]
+    G --> H{Document Relevance Grader\nLLM Binary Evaluation}
+    H -->|High Relevance >=50%| J[Filter Relevant Chunks]
+    H -->|Partial Relevance 25-50%| K[Query Reformulator\n+ Web Search Augmentation]
+    H -->|Low Relevance <25%| L[Query Reformulator\n+ Full Web Search Fallback]
+    K --> J
+    L --> J
+    J --> M[Context Formatting + Inline Citations]
+    M --> N[Gemini-2.5-flash Generation Stream]
+    N --> O{Grounding & Hallucination Guardrail}
+    O --> P[Stream Grounded Answer + Latency Breakdown]
 ```
 
 ---
 
 ## Advanced Features
 
-### 1. Hybrid Search & RRF Fusion
+### 1. Corrective RAG (CRAG) & Relevance Grading
+Instead of relying blindly on vector distance scores, miniRAG implements **Corrective RAG (CRAG)**:
+- **`DocumentGrader`**: Assesses retrieved chunks individually, assigning relevance flags, confidence scores, and reasoning.
+- **Adaptive Action Routing**: Routes queries to direct generation (high context), hybrid web-augmentation (partial context), or reformulated web search fallback (insufficient context).
+
+### 2. Hybrid Search & RRF Fusion
 To achieve optimal retrieval quality, miniRAG merges **Dense Search** (semantic context) and **Sparse Search** (keyword match). The fusion is managed by Reciprocal Rank Fusion (RRF) with a standard constant ($k=60$):
 $$\text{Score}(d \in D) = \sum_{m \in M} \frac{1}{60 + \text{rank}_m(d)}$$
 A custom **composite key** (`file_hash` + `chunk_id`) prevents document collisions during RRF fusion when processing multiple uploaded files.
 
-### 2. Multi-Stage Reranking
-To combat the "lost in the middle" LLM behavior, the pipeline routes the top 20 candidate chunks through a local CPU-bound **FlashRank Cross-Encoder**. This reranker evaluates candidate pairs directly, shrinking the context window down to the 5 most critical chunks before LLM generation.
+### 3. Multi-Stage Reranking
+To combat the "lost in the middle" LLM behavior, the pipeline routes candidate chunks through a local CPU-bound **FlashRank Cross-Encoder** (`ms-marco-MultiBERT-L-12`), evaluating candidate pairs directly before generation.
 
-### 3. Agentic Web Fallback
-When a query targets information outside the indexed documents, retrieval confidence drops. miniRAG dynamically detects this by analyzing the relevance scores of retrieved chunks:
-- If scores fall below `Config.WEB_FALLBACK_THRESHOLD` (or fewer than 2 chunks are found), the pipeline automatically triggers a fallback search using DuckDuckGo.
-- This results in augmented answers without manual intervention, avoiding empty or hallucinated responses.
-
-### 4. Citation Grounding Validation
-Every generated answer is parsed for citation indicators (e.g. `[1]`, `[2]`). An automated post-processing step validates that each citation correctly maps back to a retrieved source document. Hallucinated citations trigger visual warnings in the UI to protect user trust.
+### 4. Hallucination Detection & Grounding Self-Critique
+- **Citation Grounding**: Automated post-processing validates that each citation `[1]`, `[2]` correctly maps back to a retrieved source chunk.
+- **`GroundingChecker`**: Performs factual self-critique on generated answers, computing faithfulness percentage and flagging unsupported assertions in real-time.
 
 ---
 

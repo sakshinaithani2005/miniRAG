@@ -20,13 +20,9 @@ from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-from observability import QueryTracer
+from .observability import QueryTracer, get_logger
 
-# ChatGoogleGenerativeAI imported lazily to avoid hard dep in tests
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI  # type: ignore
-except ImportError:
-    ChatGoogleGenerativeAI = None  # type: ignore
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +94,7 @@ def rewrite_query(question: str, llm) -> str:
         rewritten = chain.invoke({"question": question}).strip()
         return rewritten if rewritten else question
     except Exception as exc:
-        print(f"⚠️  Query rewrite failed ({exc}) — using original.")
+        logger.warning("Query rewrite failed, using original", error=str(exc))
         return question
 
 
@@ -122,7 +118,7 @@ def verify_citations(answer: str, num_docs: int) -> list[str]:
     hallucinated = cited - valid
     if hallucinated:
         return [
-            f"⚠️ Hallucinated citation(s): {sorted(hallucinated)} "
+            f"Hallucinated citation(s): {sorted(hallucinated)} "
             f"(only {num_docs} context docs provided)"
         ]
     return []
@@ -230,9 +226,6 @@ def stream_rag(
         Token generator — consume with ``st.write_stream()`` or iteration.
     """
     context_str = format_docs(retrieved_docs)
-    from langchain_core.output_parsers import StrOutputParser
-    from langchain_core.prompts import ChatPromptTemplate
-
     prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
     # Build a simple chain that does NOT include retrieval
     gen_chain = prompt | chain.steps[-2] | StrOutputParser()  # llm step

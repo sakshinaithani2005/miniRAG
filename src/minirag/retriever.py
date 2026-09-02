@@ -12,11 +12,14 @@ The active strategy is selected by the ``strategy`` argument to
 
 from __future__ import annotations
 
-from config import Config, RetrievalStrategy
-from hybrid_retriever import BM25Index, HybridRetriever
+from .config import Config, RetrievalStrategy, get_settings
+from .hybrid_retriever import BM25Index, HybridRetriever
+from .observability import get_logger
 from langchain_community.document_compressors.flashrank_rerank import FlashrankRerank
 from langchain_core.documents import Document
 from langchain_pinecone import PineconeVectorStore
+
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Reranker singleton
@@ -45,7 +48,7 @@ def _init_reranker() -> FlashrankRerank | None:
             reranker.model_rebuild()
         return reranker
     except Exception as exc:
-        print(f"⚠️  FlashrankRerank init warning: {exc} — falling back to unranked retrieval.")
+        logger.warning("FlashrankRerank init warning, falling back to unranked retrieval", error=str(exc))
         return None
 
 
@@ -66,7 +69,7 @@ def _dense_retriever(vectorstore: PineconeVectorStore, top_k: int):
             base_retriever=base,
         )
     except Exception as exc:
-        print(f"⚠️  ContextualCompressionRetriever failed: {exc} — using base retriever.")
+        logger.warning("ContextualCompressionRetriever failed, using base retriever", error=str(exc))
         return base
 
 
@@ -160,7 +163,7 @@ def create_retriever(
 
     # Cannot do HYBRID without a corpus — fall back gracefully
     if chosen == RetrievalStrategy.HYBRID and not corpus:
-        print("⚠️  HYBRID requested but no corpus provided — falling back to DENSE.")
+        logger.info("HYBRID requested but no corpus provided, falling back to DENSE")
         chosen = RetrievalStrategy.DENSE
 
     if chosen == RetrievalStrategy.MMR:

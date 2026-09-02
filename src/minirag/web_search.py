@@ -10,7 +10,10 @@ Requires: ``duckduckgo-search`` (pip install duckduckgo-search)
 
 from __future__ import annotations
 
+from .observability import get_logger
 from langchain_core.documents import Document
+
+logger = get_logger(__name__)
 
 
 def web_search(query: str, max_results: int = 3) -> list[Document]:
@@ -28,7 +31,7 @@ def web_search(query: str, max_results: int = 3) -> list[Document]:
     try:
         from duckduckgo_search import DDGS  # type: ignore
     except ImportError:
-        print("⚠️  duckduckgo-search not installed. Run: pip install duckduckgo-search")
+        logger.warning("duckduckgo-search not installed. Run: pip install duckduckgo-search")
         return []
 
     results: list[Document] = []
@@ -46,7 +49,7 @@ def web_search(query: str, max_results: int = 3) -> list[Document]:
                     )
                 )
     except Exception as exc:
-        print(f"⚠️  DuckDuckGo search failed: {exc}")
+        logger.warning("DuckDuckGo search failed", error=str(exc))
 
     return results
 
@@ -109,6 +112,6 @@ def augment_with_web(
     if not should_fallback(retrieved_docs, threshold):
         return retrieved_docs
 
-    print(f"🌐 Context score below threshold — augmenting with web search: '{query}'")
+    logger.info("Context score below threshold, augmenting with web search", query=query)
     web_docs = web_search(query, max_results=max_results)
     return retrieved_docs + web_docs

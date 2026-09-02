@@ -70,19 +70,19 @@ def main() -> int:
     _load_env()
 
     # Lazy imports after env is loaded
-    from config import Config, RetrievalStrategy
-    from document_processor import process_documents
-    from llm import get_llm
-    from observability import QueryTracer, configure_logging
-    from rag_chain import create_rag_chain, query_rag
-    from retriever import create_retriever
-    from vectorstore import add_documents_to_vectorstore, get_vectorstore
+    from .config import Config, RetrievalStrategy
+    from .document_processor import process_documents
+    from .llm import get_llm
+    from .observability import QueryTracer, configure_logging
+    from .rag_chain import create_rag_chain, query_rag
+    from .retriever import create_retriever
+    from .vectorstore import add_documents_to_vectorstore, get_vectorstore
 
     configure_logging()
     args = _parse_args()
 
     if not Config.validate():
-        print("❌ Missing API keys. Set GOOGLE_API_KEY and PINECONE_API_KEY in .env", file=sys.stderr)
+        print("Error: Missing API keys. Set GOOGLE_API_KEY and PINECONE_API_KEY in .env", file=sys.stderr)
         return 1
 
     # ── Index document ────────────────────────────────────────────────────
@@ -90,10 +90,10 @@ def main() -> int:
     if args.doc:
         doc_path = Path(args.doc)
         if not doc_path.exists():
-            print(f"❌ File not found: {doc_path}", file=sys.stderr)
+            print(f"Error: File not found: {doc_path}", file=sys.stderr)
             return 1
 
-        print(f"📄 Indexing {doc_path.name} …")
+        print(f"Indexing {doc_path.name} …")
         t0 = time.perf_counter()
 
         # Simulate an UploadedFile-like object for the document processor
@@ -110,7 +110,7 @@ def main() -> int:
         vs = get_vectorstore()
         add_documents_to_vectorstore(chunks, vs)
         elapsed = time.perf_counter() - t0
-        print(f"✅ Indexed {len(chunks)} chunks in {elapsed:.2f}s")
+        print(f"Indexed {len(chunks)} chunks in {elapsed:.2f}s")
 
     # ── Retrieve & generate ───────────────────────────────────────────────
     strategy = RetrievalStrategy(args.strategy)
@@ -129,7 +129,7 @@ def main() -> int:
         tracer=tracer,
     )
 
-    # ── Output ────────────────────────────────────────────────────────────
+    # ── Output ────────────────────────────────────────────────────
     print("\n" + "=" * 70)
     print("ANSWER")
     print("=" * 70)
@@ -144,7 +144,7 @@ def main() -> int:
         print(f"    {doc.page_content[:120].strip()}…")
 
     latency = tracer.latency
-    print(f"\n⏱  Total: {latency.total_ms:.0f}ms  "
+    print(f"\nLatency: Total {latency.total_ms:.0f}ms "
           f"(retrieve: {latency.retrieve_ms:.0f}ms, "
           f"generate: {latency.generate_ms:.0f}ms)")
 

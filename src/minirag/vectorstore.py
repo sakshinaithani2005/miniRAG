@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import time
 
-from config import Config
+from .config import Config, get_settings
+from .observability import get_logger
 from langchain_core.documents import Document
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
+
+logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Initialisation
@@ -23,7 +26,7 @@ def initialize_vectorstore() -> PineconeVectorStore:
     Embeddings are resolved lazily here (after env vars are set) to avoid
     the module-import-before-env-var ordering bug.
     """
-    from embeddings import get_embeddings  # lazy — env vars already set by app.py
+    from .embeddings import get_embeddings  # lazy — env vars already set by app.py
 
     pinecone_api_key = Config.get_pinecone_api_key()
     index_name = Config.get_pinecone_index_name() or "mini-rag"
@@ -100,7 +103,7 @@ def add_documents_to_vectorstore(
         time.sleep(0.5)
     except Exception as exc:
         # 404 "Namespace not found" is expected on first run — safe to ignore
-        print(f"Note: Could not clear previous docs (likely first run): {exc}")
+        logger.debug("Could not clear previous docs (likely first run)", exc=str(exc))
 
     # ── Upload in batches of 100 to avoid request-size limits ─────────────────
     BATCH = 100
@@ -126,4 +129,4 @@ def clear_vectorstore(vectorstore: PineconeVectorStore | None = None) -> None:
         index = pc.Index(index_name)
         index.delete(delete_all=True, namespace="")
     except Exception as exc:
-        print(f"⚠️  clear_vectorstore failed: {exc}")
+        logger.warning("clear_vectorstore failed", error=str(exc))

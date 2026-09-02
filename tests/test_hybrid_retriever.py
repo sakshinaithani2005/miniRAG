@@ -2,24 +2,20 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from langchain_core.documents import Document
 
-_SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
-sys.path.insert(0, str(_SRC))
-sys.path.insert(0, str(_SRC.parent.parent))
+from minirag.hybrid_retriever import BM25Index, reciprocal_rank_fusion
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _make_docs(texts):
+    return [Document(page_content=t, metadata={"chunk_id": i + 1}) for i, t in enumerate(texts)]
 
 
 # ── BM25Index ─────────────────────────────────────────────────────────────────
 
-def _make_docs(texts):
-    from langchain_core.documents import Document
-    return [Document(page_content=t, metadata={"chunk_id": i + 1}) for i, t in enumerate(texts)]
-
-
 def test_bm25_index_top_n_returns_correct_count():
-    from hybrid_retriever import BM25Index
-
     docs = _make_docs(["alpha beta gamma", "delta epsilon", "zeta eta theta"])
     idx = BM25Index(docs)
     results = idx.get_top_n("alpha", n=2)
@@ -27,8 +23,6 @@ def test_bm25_index_top_n_returns_correct_count():
 
 
 def test_bm25_index_scores_length():
-    from hybrid_retriever import BM25Index
-
     docs = _make_docs(["foo bar", "baz qux", "quux corge"])
     idx = BM25Index(docs)
     scores = idx.get_scores("foo")
@@ -36,8 +30,6 @@ def test_bm25_index_scores_length():
 
 
 def test_bm25_index_keyword_match_ranks_first():
-    from hybrid_retriever import BM25Index
-
     docs = _make_docs([
         "transformers are neural networks",
         "attention mechanism in deep learning",
@@ -51,8 +43,6 @@ def test_bm25_index_keyword_match_ranks_first():
 # ── reciprocal_rank_fusion ────────────────────────────────────────────────────
 
 def test_rrf_merges_lists():
-    from hybrid_retriever import reciprocal_rank_fusion
-
     docs_a = _make_docs(["doc a1", "doc a2"])
     docs_b = _make_docs(["doc b1"])
 
@@ -61,8 +51,6 @@ def test_rrf_merges_lists():
 
 
 def test_rrf_deduplicates():
-    from hybrid_retriever import reciprocal_rank_fusion
-
     # Same documents in both lists
     docs = _make_docs(["shared doc"])
     fused = reciprocal_rank_fusion([docs, docs])
@@ -70,8 +58,6 @@ def test_rrf_deduplicates():
 
 
 def test_rrf_higher_ranked_docs_score_higher():
-    from hybrid_retriever import reciprocal_rank_fusion
-
     docs = _make_docs([f"doc {i}" for i in range(5)])
     # First doc is ranked #1 in both lists
     fused = reciprocal_rank_fusion([docs, docs])

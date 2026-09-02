@@ -29,10 +29,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-# Ensure src/minirag is on the path
-_SRC = Path(__file__).resolve().parent.parent / "src" / "minirag"
-sys.path.insert(0, str(_SRC))
-sys.path.insert(0, str(_SRC.parent.parent))  # repo root for flat imports
+# Ensure src is on the path
+_SRC = Path(__file__).resolve().parent.parent / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
 
 def _load_env() -> None:
@@ -76,9 +76,8 @@ def _parse_args() -> argparse.Namespace:
 
 def _index_pdf(pdf_path: Path) -> list[Any]:
     """Index a PDF and return the chunks."""
-    print(f"📄 Indexing {pdf_path.name} …")
-    from document_processor import process_documents
-    from vectorstore import add_documents_to_vectorstore, get_vectorstore
+    print(f"Indexing {pdf_path.name} …")
+    from minirag import add_documents_to_vectorstore, get_vectorstore, process_documents
 
     class _FileWrapper:
         def __init__(self, p: Path):
@@ -92,7 +91,7 @@ def _index_pdf(pdf_path: Path) -> list[Any]:
     chunks = process_documents(uploaded_file=_FileWrapper(pdf_path))
     vs = get_vectorstore()
     add_documents_to_vectorstore(chunks, vs)
-    print(f"✅ Indexed {len(chunks)} chunks.")
+    print(f"Indexed {len(chunks)} chunks.")
     return chunks
 
 
@@ -112,11 +111,14 @@ def run_evaluation(
     Returns:
         Dict with per-metric scores and aggregate stats.
     """
-    from config import RetrievalStrategy
-    from llm import get_llm
-    from rag_chain import create_rag_chain, query_rag
-    from retriever import create_retriever
-    from vectorstore import get_vectorstore
+    from minirag import (
+        RetrievalStrategy,
+        create_rag_chain,
+        create_retriever,
+        get_llm,
+        get_vectorstore,
+        query_rag,
+    )
 
     vs = get_vectorstore()
     llm = get_llm()
@@ -130,7 +132,7 @@ def run_evaluation(
     contexts: list[list[str]] = []
     ground_truths: list[str] = []
 
-    print(f"\n🔍 Running {len(qa_pairs)} queries with '{strategy}' retrieval …\n")
+    print(f"\nRunning {len(qa_pairs)} queries with '{strategy}' retrieval …\n")
 
     for i, pair in enumerate(qa_pairs, 1):
         q = pair["question"]
@@ -166,7 +168,7 @@ def run_evaluation(
             "ground_truth": ground_truths,
         })
 
-        print("\n📊 Computing RAGAS metrics …")
+        print("\nComputing RAGAS metrics …")
         t0 = time.perf_counter()
         result = evaluate(
             dataset,
@@ -185,7 +187,7 @@ def run_evaluation(
         }
 
     except ImportError:
-        print("⚠️  RAGAS not installed. Computing basic hit-rate metrics instead.")
+        print("WARNING: RAGAS not installed. Computing basic hit-rate metrics instead.")
         print("   Install with: pip install ragas datasets")
 
         # Fallback: simple grounding check
@@ -228,19 +230,15 @@ def main() -> int:
     _load_env()
     args = _parse_args()
 
-    # Add src/minirag to path
-    import sys
-    sys.path.insert(0, str(_SRC))
-
-    from config import Config
+    from minirag import Config
     if not Config.validate():
-        print("❌ Missing API keys.", file=sys.stderr)
+        print("Error: Missing API keys.", file=sys.stderr)
         return 1
 
     # Load Q/A dataset
     dataset_path = Path(args.dataset)
     if not dataset_path.exists():
-        print(f"❌ Dataset not found: {dataset_path}", file=sys.stderr)
+        print(f"Error: Dataset not found: {dataset_path}", file=sys.stderr)
         return 1
 
     with open(dataset_path) as f:
@@ -261,7 +259,7 @@ def main() -> int:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w") as f:
             json.dump(scores, f, indent=2)
-        print(f"\n💾 Results saved to {out_path}")
+        print(f"\nResults saved to {out_path}")
 
     return 0
 

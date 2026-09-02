@@ -1,19 +1,12 @@
-# ruff: noqa: E402
 """Tests for cli module."""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 from langchain_core.documents import Document
 
-_SRC = Path(__file__).resolve().parents[1] / "src" / "minirag"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
-
-from cli import _parse_args, main
+from minirag.cli import _parse_args, main
 
 
 def test_parse_args():
@@ -29,7 +22,7 @@ def test_parse_args():
 
 def test_main_missing_keys():
     with patch("sys.argv", ["cli.py", "--query", "what"]):
-        with patch("config.Config.validate", return_value=False):
+        with patch("minirag.config.Config.validate", return_value=False):
             res = main()
             assert res == 1
 
@@ -39,12 +32,12 @@ def test_main_success_no_doc():
         "sys.argv",
         ["cli.py", "--query", "what", "--strategy", "dense", "--no-rewrite"],
     ):
-        with patch("config.Config.validate", return_value=True):
-            with patch("vectorstore.get_vectorstore"):
-                with patch("retriever.create_retriever"):
-                    with patch("llm.get_llm"):
-                        with patch("rag_chain.create_rag_chain"):
-                            with patch("rag_chain.query_rag") as mock_query:
+        with patch("minirag.config.Config.validate", return_value=True):
+            with patch("minirag.vectorstore.get_vectorstore"):
+                with patch("minirag.retriever.create_retriever"):
+                    with patch("minirag.llm.get_llm"):
+                        with patch("minirag.rag_chain.create_rag_chain"):
+                            with patch("minirag.rag_chain.query_rag") as mock_query:
                                 mock_docs = [
                                     Document(
                                         page_content="some content",

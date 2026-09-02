@@ -76,7 +76,7 @@ docs/_build/
 # PyBuilder
 .pybuilder/
 target/
-
+.md/
 # Jupyter Notebook
 .ipynb_checkpoints
 
@@ -195,6 +195,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+STUDY.*
 
 # Cursor
 #  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to

@@ -11,7 +11,7 @@ import hashlib
 import os
 import tempfile
 
-from config import Config
+from .config import Config, get_settings
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
